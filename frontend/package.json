@@ -1,0 +1,29 @@
+{
+  "name": "opennhrp-manager-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "test:topology": "node --experimental-strip-types tests/topologyStatus.test.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vicons/ionicons5": "^0.12.0",
+    "axios": "^1.6.8",
+    "echarts": "^5.5.0",
+    "naive-ui": "^2.38.2",
+    "pinia": "^2.1.7",
+    "vooks": "^0.2.12",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.6",
+    "vue-tsc": "^2.0.6"
+  }
+}
