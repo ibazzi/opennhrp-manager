@@ -1,9 +1,0 @@
-Package: opennhrp-agent
-Version: @VERSION@
-Section: net
-Priority: optional
-Architecture: @ARCH@
-Depends: opennhrp, ca-certificates
-Maintainer: ibazzi <ibazzi@qq.com>
-Description: OpenNHRP management agent
- Secure outbound Agent connection for centrally managed OpenNHRP Hub and Spoke nodes.
