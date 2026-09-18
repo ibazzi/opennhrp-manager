@@ -266,6 +266,7 @@ const networkHealthText = computed(() => {
 const formatRole = (role?: string) => {
   switch (role) {
     case 'leader': return 'Leader 活跃'
+    case 'follower': return 'Follower 服务备'
     case 'standby': return 'Standby 备用'
     case 'learner': return 'Learner 同步中'
     case 'witness': return 'Witness 见证仲裁'
@@ -447,6 +448,10 @@ onUnmounted(() => {
 }
 
 .highlight-role.standby {
+  color: #3b82f6;
+}
+
+.highlight-role.follower {
   color: #3b82f6;
 }
 

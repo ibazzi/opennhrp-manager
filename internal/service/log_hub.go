@@ -32,8 +32,8 @@ func (h *LogHub) Unregister(conn *websocket.Conn) {
 }
 
 func (h *LogHub) Broadcast(entry protocol.LogEntry) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	for conn := range h.clients {
 		_ = conn.WriteJSON(entry)

@@ -115,9 +115,9 @@
             <td>
               <n-tag
                 size="small"
-                :type="s.type === 'direct' || s.type === 'dynamic' ? 'success' : s.type === 'shadow' ? 'info' : 'warning'"
+                :type="s.stale ? 'warning' : s.type === 'direct' || s.type === 'dynamic' ? 'success' : s.type === 'shadow' ? 'info' : 'warning'"
               >
-                {{ s.type }}
+                {{ s.stale ? `缓存 / ${s.type}` : s.type }}
               </n-tag>
             </td>
             <td>

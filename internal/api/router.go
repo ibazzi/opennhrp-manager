@@ -114,6 +114,7 @@ func SetupRouter(
 			{
 				managedSpokeGroup.GET("", managedSpokeHandler.List)
 				managedSpokeGroup.GET("/:id/peers", managedSpokeHandler.Peers)
+				managedSpokeGroup.GET("/:id/ha", managedSpokeHandler.HA)
 				managedSpokeGroup.POST("", adminOnly, managedSpokeHandler.Create)
 				managedSpokeGroup.POST("/:id/token/rotate", adminOnly, managedSpokeHandler.RotateToken)
 				managedSpokeGroup.DELETE("/:id", adminOnly, managedSpokeHandler.Delete)

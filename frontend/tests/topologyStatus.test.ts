@@ -53,6 +53,11 @@ const backup1FromLeader = classifyHubStatus(member('hub-backup1'), node('hub-bac
 assert.equal(classifyHALink(leaderSelf, backup1FromLeader, 'hub-primary'), 'disconnected')
 assert.match(formatHubStatus(backup1FromLeader, 90), /HA会话中断/)
 
+const follower = classifyHubStatus(member('hub-backup1'), { ...node('hub-backup1'), role: 'follower' }, undefined, context('hub-primary'))
+assert.equal(follower.state, 'follower')
+assert.equal(follower.isFollower, true)
+assert.match(formatHubStatus(follower, 90), /Follower/)
+
 // Agent liveness is an overlay: a live HA session does not become a node outage.
 const backup1AgentOffline = classifyHubStatus(member('hub-backup1', true), node('hub-backup1', 'offline'), undefined, context('hub-primary'))
 assert.equal(backup1AgentOffline.state, 'standby')
@@ -93,6 +98,7 @@ assert.equal(selectActiveNode([oldLeader, oldStandby], oldLeader.id, oldStandby.
 const managedSpokesView = readFileSync(new URL('../src/views/ManagedSpokes.vue', import.meta.url), 'utf8')
 const spokesView = readFileSync(new URL('../src/views/Spokes.vue', import.meta.url), 'utf8')
 const terminalLog = readFileSync(new URL('../src/components/TerminalLog.vue', import.meta.url), 'utf8')
+const topologyGraph = readFileSync(new URL('../src/components/TopologyGraph.vue', import.meta.url), 'utf8')
 assert.match(managedSpokesView, /spoke\.status === 'online'/)
 assert.match(managedSpokesView, /:disabled="!store\.isAdmin"/)
 assert.match(spokesView, /@click="openQuickRegister\(s\)"/)
@@ -102,6 +108,8 @@ assert.match(spokesView, /s\.managed_node_id/)
 assert.match(spokesView, /protocol_address: s\.protocol_address/)
 assert.match(spokesView, /Token 只显示这一次/)
 assert.match(terminalLog, /props\.nodeId && data\.node_id !== props\.nodeId/)
+assert.match(topologyGraph, /const selectedSpokeHub = hubNodes\.find\(\(h\) => h\.memberId === localMemberId\)/)
+assert.doesNotMatch(topologyGraph, /h\.hubStatus\?\.isLeader && h\.hubStatus\.isOnline/)
 const staleLeader = node('hub-primary')
 staleLeader.term = 10
 staleLeader.role = 'leader'

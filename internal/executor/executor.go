@@ -18,7 +18,7 @@ type ClusterStatusInfo struct {
 	Term                 uint64             `json:"term"`
 	CommitIndex          uint64             `json:"commit_index"`
 	Leader               string             `json:"leader"`
-	LocalRole            string             `json:"local_role"` // leader, standby, learner, isolated, witness
+	LocalRole            string             `json:"local_role"` // leader, follower, standby, learner, isolated, witness
 	ManifestRevision     uint64             `json:"manifest_revision"`
 	Digest               string             `json:"digest"`
 	ServiceAvail         bool               `json:"service_available"`
@@ -76,6 +76,55 @@ type MemberInfo struct {
 	Authenticated bool     `json:"authenticated"`
 	RttMs         float64  `json:"rtt_ms,omitempty"`
 	Digest        string   `json:"digest,omitempty"`
+}
+
+type HAStatusInfo struct {
+	Error               string            `json:"error,omitempty"`
+	EventSequence       uint64            `json:"event_sequence"`
+	Interface           string            `json:"interface"`
+	Mode                string            `json:"mode"`
+	CoordinatorState    string            `json:"coordinator_state"`
+	CoordinatorLastExit int               `json:"coordinator_last_exit"`
+	Protocol            string            `json:"protocol,omitempty"`
+	PrefixLength        int               `json:"prefix_length,omitempty"`
+	Generation          uint64            `json:"generation,omitempty"`
+	HubListGeneration   uint64            `json:"hub_list_generation,omitempty"`
+	HubListSource       string            `json:"hub_list_source,omitempty"`
+	Switching           bool              `json:"switching,omitempty"`
+	AuthMode            string            `json:"auth_mode"`
+	AuthClusterID       string            `json:"auth_cluster_id,omitempty"`
+	SeenTerm            uint64            `json:"seen_term,omitempty"`
+	SeenCommitIndex     uint64            `json:"seen_commit_index,omitempty"`
+	SeenLeader          string            `json:"seen_leader,omitempty"`
+	CurrentKeyID        string            `json:"current_key_id,omitempty"`
+	NextKeyID           string            `json:"next_key_id,omitempty"`
+	ActiveMember        *string           `json:"active_member,omitempty"`
+	Candidates          []HACandidateInfo `json:"candidates"`
+}
+
+type HACandidateInfo struct {
+	Member            string   `json:"member"`
+	NBMA              string   `json:"nbma"`
+	Addresses         []string `json:"addresses"`
+	EndpointReachable []bool   `json:"endpoint_reachable"`
+	SelectedAddress   string   `json:"selected_address"`
+	Priority          int      `json:"priority"`
+	LocalNBMA         *string  `json:"local_nbma,omitempty"`
+	LocalNBMAOrigin   *string  `json:"local_nbma_origin,omitempty"`
+	Origin            string   `json:"origin"`
+	State             string   `json:"state"`
+	Registered        bool     `json:"registered"`
+	Ready             bool     `json:"ready"`
+	Active            bool     `json:"active"`
+	Authenticated     bool     `json:"authenticated"`
+	AuthKeyID         *string  `json:"auth_key_id,omitempty"`
+	Term              uint64   `json:"term"`
+	CommitIndex       uint64   `json:"commit_index"`
+	Leader            *string  `json:"leader,omitempty"`
+	SrttMs            float64  `json:"srtt_ms"`
+	RtoMs             float64  `json:"rto_ms"`
+	LossPct           float64  `json:"loss_pct"`
+	Score             uint     `json:"score"`
 }
 
 type ReplicationStatusInfo struct {
@@ -163,6 +212,7 @@ type NodeExecutor interface {
 
 	// OpenNHRP HA Cluster Management
 	GetClusterStatus(ctx context.Context) (*ClusterStatusInfo, error)
+	GetHAStatus(ctx context.Context, iface string) (*HAStatusInfo, error)
 	GetReplicationStatus(ctx context.Context) (*ReplicationStatusInfo, error)
 	GetMembers(ctx context.Context) ([]MemberInfo, error)
 	SetMember(ctx context.Context, memberID string, priority int, disabled *bool, remove bool) error

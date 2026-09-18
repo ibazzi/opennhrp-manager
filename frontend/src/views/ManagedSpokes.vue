@@ -70,6 +70,38 @@
         </n-grid-item>
       </n-grid>
 
+      <n-card v-if="haStatus" title="Spoke HA Hub 路径与质量" class="mb-4">
+        <div class="ha-summary">
+          <span>接口: <code>{{ haStatus.interface }}</code></span>
+          <span>当前 Hub: <code>{{ haStatus.active_member || '-' }}</code></span>
+          <span>协调器: {{ haStatus.coordinator_state }}</span>
+          <span>切换: {{ haStatus.switching ? '进行中' : '稳定' }}</span>
+        </div>
+        <n-scrollbar x-scrollable>
+          <n-table size="small" :bordered="false" style="min-width: 760px">
+            <thead><tr><th>Hub</th><th>状态</th><th>Selected endpoint</th><th>RTT</th><th>Loss</th><th>Score</th><th>Term / Leader</th></tr></thead>
+            <tbody>
+              <tr v-if="haStatus.candidates.length === 0"><td colspan="7" class="empty">暂无 Hub 候选</td></tr>
+              <tr v-for="candidate in haStatus.candidates" :key="candidate.member">
+                <td><strong>{{ candidate.member }}</strong><span v-if="candidate.active">（当前）</span></td>
+                <td>
+                  <n-tag size="small" :type="candidate.ready ? 'success' : candidate.state === 'suspect' ? 'warning' : 'default'">{{ candidate.state }}
+                  </n-tag>
+                </td>
+                <td><code>{{ candidate.selected_address || '-' }}</code></td>
+                <td>{{ candidate.srtt_ms.toFixed(1) }} ms</td>
+                <td>{{ candidate.loss_pct.toFixed(1) }}%</td>
+                <td>
+                  <n-tag size="small" :type="candidate.active ? 'success' : 'info'">{{ candidate.score }}
+                  </n-tag>
+                </td>
+                <td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td>
+              </tr>
+            </tbody>
+          </n-table>
+        </n-scrollbar>
+      </n-card>
+
       <n-card title="opennhrp.conf" class="mb-4">
         <n-input v-model:value="configContent" type="textarea" :rows="14" class="config-editor" />
         <n-space justify="end" class="mt-2">
@@ -107,7 +139,7 @@ import { NAlert, NButton, NCard, NForm, NFormItem, NGrid, NGridItem, NInput, NMo
 import { api } from '../api/client'
 import TerminalLog from '../components/TerminalLog.vue'
 import { useAppStore } from '../store'
-import type { InterfaceInfo, ManagedSpoke, SpokeInfo } from '../types'
+import type { HAStatus, InterfaceInfo, ManagedSpoke, SpokeInfo } from '../types'
 
 const store = useAppStore()
 const message = useMessage()
@@ -116,6 +148,7 @@ const spokes = ref<ManagedSpoke[]>([])
 const selectedId = ref('')
 const interfaces = ref<InterfaceInfo[]>([])
 const peers = ref<SpokeInfo[]>([])
+const haStatus = ref<HAStatus | null>(null)
 const configContent = ref('')
 const saving = ref(false)
 const showCreate = ref(false)
@@ -138,11 +171,26 @@ const loadSpokes = async () => {
 
 const selectSpoke = async (id: string) => {
   selectedId.value = id
+  haStatus.value = null
   const [ifaces, peerList, config] = await Promise.allSettled([api.listInterfaces(id), api.listManagedSpokePeers(id), api.getConfigFile(id)])
   interfaces.value = ifaces.status === 'fulfilled' ? ifaces.value : []
   peers.value = peerList.status === 'fulfilled' ? peerList.value : []
   configContent.value = config.status === 'fulfilled' ? config.value.content : ''
   if (ifaces.status === 'rejected' && peerList.status === 'rejected' && config.status === 'rejected') message.error('读取 Spoke 状态失败')
+  await loadHAStatus(id)
+}
+
+const loadHAStatus = async (id: string) => {
+  const iface = interfaces.value.find((item) => item.name === 'gre-ha')?.name || interfaces.value[0]?.name || ''
+  if (!iface) {
+    haStatus.value = null
+    return
+  }
+  try {
+    haStatus.value = await api.getManagedSpokeHA(id, iface)
+  } catch {
+    haStatus.value = null
+  }
 }
 
 const showIssuedToken = (token: string) => {
@@ -212,7 +260,10 @@ onMounted(async () => {
   await loadSpokes()
   const requestedNode = typeof route.query.node === 'string' ? route.query.node : ''
   if (requestedNode && spokes.value.some((item) => item.id === requestedNode)) await selectSpoke(requestedNode)
-  refreshTimer = window.setInterval(loadSpokes, 3000)
+  refreshTimer = window.setInterval(async () => {
+    await loadSpokes()
+    if (selectedId.value) await loadHAStatus(selectedId.value)
+  }, 3000)
 })
 onUnmounted(() => refreshTimer && window.clearInterval(refreshTimer))
 </script>
@@ -225,6 +276,7 @@ onUnmounted(() => refreshTimer && window.clearInterval(refreshTimer))
 .empty { text-align: center; padding: 18px; }
 .mb-4 { margin-bottom: 16px; }
 .mt-2 { margin-top: 8px; }
+.ha-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; color: var(--text-muted); }
 tbody tr { cursor: pointer; }
 tbody tr.selected { background: var(--bg-card-secondary); }
 .config-editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }

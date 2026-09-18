@@ -141,6 +141,21 @@ func (a *AgentExecutor) GetClusterStatus(ctx context.Context) (*ClusterStatusInf
 	return ParseClusterStatusFromJSON(resp.RawText, a.nodeID, "")
 }
 
+func (a *AgentExecutor) GetHAStatus(ctx context.Context, iface string) (*HAStatusInfo, error) {
+	command := "ha show format json\n"
+	if iface != "" {
+		if strings.ContainsAny(iface, " \t\r\n") {
+			return nil, fmt.Errorf("invalid interface name")
+		}
+		command = fmt.Sprintf("ha show interface %s format json\n", iface)
+	}
+	resp, err := a.sendCommand(ctx, "opennhrp", command, nil)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHAStatusFromJSON(resp.RawText)
+}
+
 func (a *AgentExecutor) GetReplicationStatus(ctx context.Context) (*ReplicationStatusInfo, error) {
 	resp, err := a.sendCommand(ctx, "opennhrp-ha", "ha replication show --format json\n", nil)
 	if err != nil {

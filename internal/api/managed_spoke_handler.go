@@ -252,3 +252,31 @@ func (h *ManagedSpokeHandler) Peers(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, peers)
 }
+
+func (h *ManagedSpokeHandler) HA(c *gin.Context) {
+	id := c.Param("id")
+	var nodeType string
+	if err := h.database.QueryRow(`SELECT type FROM nodes WHERE id=?`, id).Scan(&nodeType); err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "managed spoke not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	if nodeType != "spoke" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node is not a managed spoke"})
+		return
+	}
+	exec, err := h.nodeMgr.GetExecutor(id)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+	status, err := exec.GetHAStatus(c.Request.Context(), c.Query("interface"))
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, status)
+}

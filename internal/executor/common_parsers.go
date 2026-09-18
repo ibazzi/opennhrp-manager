@@ -92,13 +92,25 @@ func ParseClusterStatusFromJSON(rawText, defaultNodeID, stateDir string) (*Clust
 		info.NetworkHealthStatus = "unknown"
 	}
 
-	// Determine LocalRole
+	// Match managed-hub core roles: a non-isolated node needs service and quorum.
+	serviceable := raw.ServiceAvailable && !raw.Isolated
+	if raw.Witness.Mode != "" {
+		serviceable = serviceable && raw.Witness.QuorumAvailable
+	}
 	if raw.Isolated {
 		info.LocalRole = "isolated"
 	} else if raw.Leader == member && raw.Leader != "" {
-		info.LocalRole = "leader"
+		if serviceable {
+			info.LocalRole = "leader"
+		} else {
+			info.LocalRole = "standby"
+		}
 	} else if raw.Leader != "" {
-		info.LocalRole = "standby"
+		if serviceable {
+			info.LocalRole = "follower"
+		} else {
+			info.LocalRole = "standby"
+		}
 	} else {
 		info.LocalRole = "standalone"
 	}
@@ -166,6 +178,20 @@ func ParseClusterStatusFromJSON(rawText, defaultNodeID, stateDir string) (*Clust
 	}
 
 	return info, nil
+}
+
+func ParseHAStatusFromJSON(rawText string) (*HAStatusInfo, error) {
+	raw, err := ParseJSON[HAStatusInfo](rawText)
+	if err != nil {
+		return nil, fmt.Errorf("parse HA status json failed: %w", err)
+	}
+	if raw.Error != "" {
+		return nil, fmt.Errorf("OpenNHRP HA status: %s", raw.Error)
+	}
+	if raw.Interface == "" {
+		return nil, fmt.Errorf("OpenNHRP HA status has no interface")
+	}
+	return raw, nil
 }
 
 type rawReplicationStatus struct {

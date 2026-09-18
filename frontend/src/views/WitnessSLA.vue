@@ -116,6 +116,43 @@
       </template>
     </n-grid>
 
+    <!-- Selected Hub's current Spokes -->
+    <n-card v-if="selectedNode !== 'all'" :title="`${getNodeDisplayName(selectedNode)} 当前连接的 Spoke`" class="mb-4">
+      <n-scrollbar x-scrollable>
+        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 760px;">
+          <thead>
+            <tr>
+              <th>Protocol 地址</th>
+              <th>NBMA 地址</th>
+              <th>接口</th>
+              <th>类型</th>
+              <th>Flags</th>
+              <th>剩余时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="selectedSpokesLoading">
+              <td colspan="6" class="text-center text-gray-500">正在读取...</td>
+            </tr>
+            <tr v-else-if="selectedSpokesError">
+              <td colspan="6" class="text-center text-gray-500">{{ selectedSpokesError }}</td>
+            </tr>
+            <tr v-else-if="selectedSpokes.length === 0">
+              <td colspan="6" class="text-center text-gray-500">当前 Hub 没有可显示的 Spoke</td>
+            </tr>
+            <tr v-for="spoke in selectedSpokes" :key="`${spoke.interface}-${spoke.protocol_address}-${spoke.nbma_address}`">
+              <td>{{ spoke.protocol_address }}</td>
+              <td>{{ spoke.nbma_address }}</td>
+              <td>{{ spoke.interface }}</td>
+              <td>{{ spoke.type }}<span v-if="spoke.stale">（缓存）</span></td>
+              <td>{{ spoke.flags || '-' }}</td>
+              <td>{{ spoke.expires_in_sec }}s</td>
+            </tr>
+          </tbody>
+        </n-table>
+      </n-scrollbar>
+    </n-card>
+
     <!-- Arbitration Decisions History -->
     <n-card title="Witness 历史仲裁事件（非当前状态）" class="mb-4">
       <n-alert type="info" :show-icon="false" class="mb-2">
@@ -240,7 +277,7 @@ import { PulseOutline } from '@vicons/ionicons5'
 import { api } from '../api/client'
 import { useAppStore } from '../store'
 import ProbeLineChart from '../components/ProbeLineChart.vue'
-import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, WitnessQuorumStatus } from '../types'
+import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, WitnessQuorumStatus, SpokeInfo } from '../types'
 
 const store = useAppStore()
 
@@ -251,10 +288,14 @@ const arbitrations = ref<ArbitrationRecord[]>([])
 const quorum = ref<WitnessQuorumStatus | null>(null)
 
 const selectedNode = ref<string>('all')
+const selectedSpokes = ref<SpokeInfo[]>([])
+const selectedSpokesLoading = ref(false)
+const selectedSpokesError = ref('')
 const probeLayer = ref<'l3_nbma' | 'l4_port' | 'all'>('l3_nbma')
 const metricType = ref<'all' | 'rtt' | 'loss'>('all')
 const timeHours = ref<number>(1)
 let probeRequestSequence = 0
+let spokeRequestSequence = 0
 
 const healthyNodesCount = computed(
   () => (slaList.value || []).filter((s) => s && s.overall_state === 'healthy').length
@@ -304,8 +345,12 @@ const nodeFilterOptions = computed(() => {
   if (Array.isArray(slaList.value)) {
     slaList.value.forEach((s) => {
       if (s && s.node_id) {
+        const node = store.nodes.find((item) => item.id === s.node_id)
+        const role = node?.role === 'leader' ? 'Leader'
+          : node?.role === 'follower' ? 'Follower'
+          : node?.role || 'Hub'
         options.push({
-          label: getNodeDisplayName(s.node_id),
+          label: `${getNodeDisplayName(s.node_id)} (${role})`,
           value: s.node_id,
         })
       }
@@ -313,6 +358,34 @@ const nodeFilterOptions = computed(() => {
   }
   return options
 })
+
+const loadSelectedSpokes = async () => {
+  const nodeId = selectedNode.value
+  const sequence = ++spokeRequestSequence
+  if (nodeId === 'all') {
+    selectedSpokes.value = []
+    selectedSpokesError.value = ''
+    selectedSpokesLoading.value = false
+    return
+  }
+
+  selectedSpokesLoading.value = true
+  selectedSpokesError.value = ''
+  try {
+    const data = await api.listSpokes(nodeId)
+    if (sequence === spokeRequestSequence) {
+      selectedSpokes.value = Array.isArray(data) ? data : []
+    }
+  } catch (e) {
+    if (sequence === spokeRequestSequence) {
+      selectedSpokes.value = []
+      selectedSpokesError.value = '无法读取所选 Hub 的实时 Spoke（Agent 不可达且无缓存）'
+    }
+    console.error('Failed to load selected Hub Spokes', e)
+  } finally {
+    if (sequence === spokeRequestSequence) selectedSpokesLoading.value = false
+  }
+}
 
 const loadProbes = async () => {
   const sequence = ++probeRequestSequence
@@ -350,12 +423,14 @@ const loadQuorum = async () => {
 }
 
 watch([selectedNode, probeLayer, timeHours], loadProbes)
+watch(selectedNode, loadSelectedSpokes)
 
 onMounted(() => {
   loadData()
   loadQuorum()
   quorumTimer = window.setInterval(loadQuorum, 1000)
   loadProbes()
+  loadSelectedSpokes()
   if (store.nodes.length === 0) {
     store.fetchNodes()
   }

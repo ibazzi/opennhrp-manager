@@ -46,7 +46,7 @@ type HeartbeatPayload struct {
 	Primary          string          `json:"primary,omitempty"`
 	Leader           string          `json:"leader,omitempty"`
 	AdvertisedIP     string          `json:"advertised_ip,omitempty"`
-	LocalRole        string          `json:"local_role"` // leader, standby, learner, isolated
+	LocalRole        string          `json:"local_role"` // leader, follower, standby, learner, isolated
 	Term             uint64          `json:"term"`
 	CommitIndex      uint64          `json:"commit_index"`
 	ManifestRevision uint64          `json:"manifest_revision"`

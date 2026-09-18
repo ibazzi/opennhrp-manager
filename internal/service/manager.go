@@ -235,6 +235,15 @@ func (m *NodeManager) GetHubExecutor(nodeID string) (executor.NodeExecutor, erro
 			return exec, nil
 		}
 	}
+	for id, exec := range m.agents {
+		if exec == nil || exec.GetNodeType() != "hub" {
+			continue
+		}
+		node, err := m.database.GetNode(id)
+		if err == nil && node.Role == "follower" {
+			return exec, nil
+		}
+	}
 	for _, exec := range m.agents {
 		if exec != nil && exec.GetNodeType() == "hub" {
 			return exec, nil

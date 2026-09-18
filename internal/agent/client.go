@@ -166,7 +166,7 @@ func (a *AgentClient) connectAndServe(ctx context.Context) error {
 					leader = status.Leader
 					manifestRevision = status.ManifestRevision
 					digest = status.Digest
-					if status.LocalRole == "leader" {
+					if status.LocalRole == "leader" || status.LocalRole == "follower" {
 						reportedSpokes = spokesCount
 					}
 					witness = protocol.WitnessPayload{

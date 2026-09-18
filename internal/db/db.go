@@ -22,7 +22,7 @@ type NodeRecord struct {
 	Host          string    `json:"host"`
 	AuthToken     string    `json:"-"`
 	Status        string    `json:"status"` // online, offline, degraded
-	Role          string    `json:"role"`   // leader, standby, learner, isolated
+	Role          string    `json:"role"`   // leader, follower, standby, learner, isolated
 	Term          uint64    `json:"term"`
 	Priority      int       `json:"priority"`
 	AdvertisedIP  string    `json:"advertised_ip"`

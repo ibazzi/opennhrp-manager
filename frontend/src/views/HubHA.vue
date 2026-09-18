@@ -526,9 +526,13 @@ function memberHAStatus(member: MemberInfo) {
 			return '已隔离'
 		}
 		if (!clusterServiceAvailable.value) return '服务不可用 (本机)'
-		return isLeader ? '在线 (Leader / 本机)' : '在线 (本机)'
+		const role = managerNode(member)?.role
+		return isLeader ? '在线 (Leader / 本机)' : role === 'follower' ? '在线 (Follower / 本机)' : '在线 (本机)'
 	}
-	if (member.connected && member.authenticated) return isLeader ? '在线 (Leader / 已认证)' : '在线 (已认证同步)'
+	if (member.connected && member.authenticated) {
+		const role = managerNode(member)?.role
+		return isLeader ? '在线 (Leader / 已认证)' : role === 'follower' ? '在线 (Follower / 已认证)' : '在线 (已认证同步)'
+	}
   if (member.connected) return '连接未认证'
   return 'HA 会话中断'
 }

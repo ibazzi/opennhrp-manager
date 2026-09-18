@@ -21,6 +21,7 @@ import type {
   UpdateUserPayload,
   ChangePasswordPayload,
   WitnessQuorumStatus,
+  HAStatus,
 } from '../types'
 
 const http = axios.create({
@@ -156,6 +157,9 @@ export const api = {
 
   listManagedSpokePeers: (id: string) =>
     http.get<SpokeInfo[]>(`/managed-spokes/${encodeURIComponent(id)}/peers`).then((r) => r.data),
+
+  getManagedSpokeHA: (id: string, iface = '') =>
+    http.get<HAStatus>(`/managed-spokes/${encodeURIComponent(id)}/ha`, { params: { interface: iface } }).then((r) => r.data),
 
   // Witness & SLA
   getSLAMatrix: () =>

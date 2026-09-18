@@ -114,6 +114,8 @@ export const useAppStore = defineStore('app', () => {
       let roleText = n.role || ''
       if (n.role === 'leader') {
         roleText = 'Leader 主节点'
+      } else if (n.role === 'follower') {
+        roleText = 'Follower 服务备节点'
       } else if (n.role === 'standby') {
         roleText = 'Standby 备节点'
       } else if (n.role === 'learner') {

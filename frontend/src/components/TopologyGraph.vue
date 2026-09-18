@@ -923,15 +923,13 @@ const renderTopology = () => {
   // ==========================================
   // Spokes
   // ==========================================
-  const activeSpokeHub = hubNodes.find((h) =>
-    h.hubStatus?.isLeader && h.hubStatus.isOnline && !h.hubStatus.isIsolated,
-  )
+  const selectedSpokeHub = hubNodes.find((h) => h.memberId === localMemberId)
 
   const displaySpokes = spokeList.value.slice(0, 10)
   const total = displaySpokes.length
 
-  if (total > 0 && activeSpokeHub) {
-    const spokeOriginY = activeSpokeHub.y + activeSpokeHub.radius + TOPO_LAYOUT.bezier.spokeOriginClearanceY
+  if (total > 0 && selectedSpokeHub) {
+    const spokeOriginY = selectedSpokeHub.y + selectedSpokeHub.radius + TOPO_LAYOUT.bezier.spokeOriginClearanceY
 
     if (!mobile) {
       const { y: spokeY, radius: spRadius, availableWidth, maxStep, linkWidth } = TOPO_LAYOUT.spoke.desktop
@@ -943,10 +941,10 @@ const renderTopology = () => {
         const spNode = createSpokeNode(spoke, idx, sx, spokeY, spRadius, isDark, false)
         nList.push(spNode)
 
-        const pathD = buildSpokePath(activeSpokeHub.x, spokeOriginY, sx, spokeY, spRadius)
+        const pathD = buildSpokePath(selectedSpokeHub.x, spokeOriginY, sx, spokeY, spRadius)
         lList.push({
           id: 'spoke-' + spoke.protocol_address,
-          source: { x: activeSpokeHub.x, y: spokeOriginY },
+          source: { x: selectedSpokeHub.x, y: spokeOriginY },
           target: { x: sx, y: spokeY },
           color: TOPO_THEME.link.spoke,
           width: linkWidth,
@@ -980,10 +978,10 @@ const renderTopology = () => {
           const spNode = createSpokeNode(spoke, spokeIndex, sx, rowY, spRadius, isDark, true)
           nList.push(spNode)
 
-          const pathD = buildSpokePath(activeSpokeHub.x, spokeOriginY, sx, rowY, spRadius)
+          const pathD = buildSpokePath(selectedSpokeHub.x, spokeOriginY, sx, rowY, spRadius)
           lList.push({
             id: 'spoke-' + spoke.protocol_address,
-            source: { x: activeSpokeHub.x, y: spokeOriginY },
+            source: { x: selectedSpokeHub.x, y: spokeOriginY },
             target: { x: sx, y: rowY },
             color: TOPO_THEME.link.spoke,
             width: linkWidth,

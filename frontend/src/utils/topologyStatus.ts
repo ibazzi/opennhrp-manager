@@ -1,7 +1,7 @@
 import type { MemberInfo, NodeRecord, SLAMatrixItem, WitnessQuorumStatus, WitnessStatus } from '../types'
 
 export type HASessionState = 'connected' | 'disconnected' | 'self' | 'unknown'
-export type HubDisplayState = 'disabled' | 'offline' | 'isolated' | 'learner' | 'leader' | 'standby'
+export type HubDisplayState = 'disabled' | 'offline' | 'isolated' | 'learner' | 'leader' | 'follower' | 'standby'
 export type HALinkState = 'online' | 'disconnected' | 'unknown' | 'disabled'
 
 export interface HubStatusContext {
@@ -24,6 +24,7 @@ export interface HubTopologyStatus {
   isOffline: boolean
   isIsolated: boolean
   isLearner: boolean
+  isFollower: boolean
   isAgentOnline: boolean
   isAgentOffline: boolean
   termMismatch: boolean
@@ -94,6 +95,7 @@ export function classifyHubStatus(
   const isAgentOffline = Boolean(node) && !isAgentOnline
   const termMismatch = Boolean(node?.term && context.term && node.term !== context.term)
   const isLearner = member.state === 'learner' || node?.role === 'learner'
+  const isFollower = node?.role === 'follower'
   const isSelf = member.member_id === context.selectedMemberId
   const isIsolated = !isDisabled && (
     node?.role === 'isolated' ||
@@ -119,7 +121,9 @@ export function classifyHubStatus(
           ? 'learner'
           : isLeader
             ? 'leader'
-            : 'standby'
+            : isFollower
+              ? 'follower'
+              : 'standby'
 
   return {
     memberId: member.member_id,
@@ -132,6 +136,7 @@ export function classifyHubStatus(
     isOffline,
     isIsolated,
     isLearner,
+    isFollower,
     isAgentOnline,
     isAgentOffline,
     termMismatch,
@@ -186,7 +191,7 @@ export function formatHubStatus(
   if (status.isIsolated) return `${role} 已隔离 (${witnessProblem(quorum) || 'Isolated'} / Pri: ${priority})`
   if (status.isLearner) return `${role} 同步中 (Learner / Pri: ${priority})`
 
-  const details = [status.isLeader ? 'Leader' : 'Standby']
+  const details = [status.isLeader ? 'Leader' : status.isFollower ? 'Follower' : 'Standby']
   if (status.session === 'disconnected') details.push('HA会话中断')
   if (status.termMismatch) details.push('Term未收敛')
   if (status.isAgentOffline) details.push('Agent离线')

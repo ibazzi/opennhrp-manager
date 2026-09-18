@@ -11,7 +11,7 @@ export interface ClusterStatus {
   term: number
   commit_index: number
   leader: string
-  local_role: 'leader' | 'standby' | 'learner' | 'isolated' | 'standalone'
+  local_role: 'leader' | 'follower' | 'standby' | 'learner' | 'isolated' | 'standalone'
   manifest_revision: number
   digest?: string
   service_available: boolean
@@ -102,6 +102,54 @@ export interface MemberInfo {
   authenticated: boolean
   rtt_ms?: number
   digest?: string
+}
+
+export interface HAStatus {
+  event_sequence: number
+  interface: string
+  mode: string
+  coordinator_state: string
+  coordinator_last_exit: number
+  protocol?: string
+  prefix_length?: number
+  generation?: number
+  hub_list_generation?: number
+  hub_list_source?: string
+  switching?: boolean
+  auth_mode: string
+  auth_cluster_id?: string
+  seen_term?: number
+  seen_commit_index?: number
+  seen_leader?: string
+  current_key_id?: string
+  next_key_id?: string
+  active_member?: string
+  candidates: HACandidate[]
+}
+
+export interface HACandidate {
+  member: string
+  nbma: string
+  addresses: string[]
+  endpoint_reachable: boolean[]
+  selected_address: string
+  priority: number
+  local_nbma?: string
+  local_nbma_origin?: string
+  origin: string
+  state: string
+  registered: boolean
+  ready: boolean
+  active: boolean
+  authenticated: boolean
+  auth_key_id?: string
+  term: number
+  commit_index: number
+  leader?: string
+  srtt_ms: number
+  rto_ms: number
+  loss_pct: number
+  score: number
 }
 
 export interface ReplicationStatus {
