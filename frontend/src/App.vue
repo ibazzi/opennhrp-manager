@@ -298,14 +298,9 @@ const menuOptions = computed(() => {
       icon: renderIcon(GitNetworkOutline),
     },
     {
-      label: 'Spoke 客户端管理',
+      label: 'Spoke 管理',
       key: '/spokes',
       icon: renderIcon(PulseOutline),
-    },
-    {
-      label: 'Spoke 设备管理',
-      key: '/managed-spokes',
-      icon: renderIcon(SettingsOutline),
     },
     {
       label: 'Spoke 配置生成向导',
@@ -509,6 +504,67 @@ code {
 .info-tip .n-icon {
   vertical-align: 0 !important;
 }
+
+/* All tables unified: clean horizontal lines, NO vertical divider lines, no wrapping by default, GLOBAL STICKY HEADER */
+.n-table {
+  border: none !important;
+  overflow: visible;
+}
+
+.n-scrollbar:has(> .n-scrollbar-container > .n-scrollbar-content > .n-table) {
+  max-height: min(60vh, 560px);
+}
+
+.n-table thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
+
+.n-table thead th,
+.n-table th {
+  background: var(--bg-card) !important;
+  z-index: 10 !important;
+  border-right: none !important;
+  border-left: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 var(--border-color) !important;
+}
+
+.n-table td {
+  border-right: none !important;
+  border-left: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  white-space: nowrap;
+}
+
+.n-table td.allow-wrap,
+.n-table th.allow-wrap {
+  white-space: normal;
+}
+
+.n-data-table {
+  border: none !important;
+}
+
+.n-data-table .n-data-table-th {
+  background: var(--bg-card) !important;
+  z-index: 10 !important;
+  border-right: none !important;
+  border-left: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 var(--border-color) !important;
+}
+
+.n-data-table .n-data-table-td {
+  border-right: none !important;
+  border-left: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  white-space: nowrap;
+}
+
 </style>
 
 <style scoped>
@@ -630,66 +686,6 @@ code {
   overflow: hidden;
   height: calc(100vh - 56px);
   transition: background-color 0.2s ease;
-}
-
-/* All tables unified: clean horizontal lines, NO vertical divider lines, no wrapping by default, GLOBAL STICKY HEADER */
-.n-table {
-  border: none !important;
-}
-
-.n-table thead,
-.n-table thead tr {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 10 !important;
-}
-
-.n-table thead th,
-.n-table th {
-  position: sticky !important;
-  top: 0 !important;
-  background: var(--bg-card) !important;
-  z-index: 10 !important;
-  border-right: none !important;
-  border-left: none !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
-  box-shadow: 0 1px 0 var(--border-color) !important;
-}
-
-.n-table td {
-  border-right: none !important;
-  border-left: none !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
-}
-
-.n-table td.allow-wrap,
-.n-table th.allow-wrap {
-  white-space: normal;
-}
-
-.n-data-table {
-  border: none !important;
-}
-
-.n-data-table .n-data-table-th {
-  position: sticky !important;
-  top: 0 !important;
-  background: var(--bg-card) !important;
-  z-index: 10 !important;
-  border-right: none !important;
-  border-left: none !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
-  box-shadow: 0 1px 0 var(--border-color) !important;
-}
-
-.n-data-table .n-data-table-td {
-  border-right: none !important;
-  border-left: none !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
 }
 
 /* Mobile Responsiveness Rules */

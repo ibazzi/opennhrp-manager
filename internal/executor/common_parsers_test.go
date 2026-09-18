@@ -1,9 +1,40 @@
 package executor
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+func TestSpokeRegistrationMode(t *testing.T) {
+	for _, tc := range []struct{ reported, want string }{
+		{"ha", "ha"}, {"legacy", "legacy"}, {"", ""}, {"invalid", ""},
+	} {
+		t.Run(tc.reported, func(t *testing.T) {
+			raw := "Type: dynamic\nProtocol-Address: 10.164.0.252/32\n"
+			if tc.reported != "" {
+				raw += "Registration-Mode: " + tc.reported + "\n"
+			}
+			raw += "Flags: used up\n\nType: static\nProtocol-Address: 10.164.0.1/32\n"
+			spokes := ParseSpokeOutput(raw)
+			if len(spokes) != 2 || spokes[0].RegistrationMode != tc.want || spokes[1].RegistrationMode != "" {
+				t.Fatalf("unexpected modes: %+v", spokes)
+			}
+			data, err := json.Marshal(spokes[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(data, &payload); err != nil {
+				t.Fatal(err)
+			}
+			mode, present := payload["registration_mode"]
+			if present != (tc.want != "") || (present && mode != tc.want) {
+				t.Fatalf("unexpected JSON: %s", data)
+			}
+		})
+	}
+}
 
 func TestCurrentOpenNHRPOutputs(t *testing.T) {
 	cluster, err := ParseClusterStatusFromJSON(`Status: ok

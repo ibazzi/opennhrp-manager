@@ -121,8 +121,16 @@ func (h *ManagedSpokeHandler) Create(c *gin.Context) {
 	req.Name = strings.TrimSpace(req.Name)
 	nameLen := utf8.RuneCountInString(req.Name)
 	protocolAddress, validProtocolAddress := normalizeManagedSpokeProtocolAddress(req.ProtocolAddress)
-	if !managedSpokeID.MatchString(req.ID) || nameLen == 0 || nameLen > 128 || !validProtocolAddress {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id must be 1-64 safe characters and name must be 1-128 characters"})
+	if !managedSpokeID.MatchString(req.ID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "节点 ID 必须为 1–64 个字符，以英文字母或数字开头，仅允许英文字母、数字、点、下划线和连字符"})
+		return
+	}
+	if nameLen == 0 || nameLen > 128 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "显示名称不能为空，且不能超过 128 个字符"})
+		return
+	}
+	if !validProtocolAddress {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Protocol IP 必须为有效的 IP 地址或 CIDR，也可以留空"})
 		return
 	}
 	if protocolAddress != "" {

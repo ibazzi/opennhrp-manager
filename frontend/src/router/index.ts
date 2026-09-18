@@ -1,15 +1,14 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import HubHA from '../views/HubHA.vue'
-import Spokes from '../views/Spokes.vue'
-import ManagedSpokes from '../views/ManagedSpokes.vue'
+import SpokeManagement from '../views/SpokeManagement.vue'
 import Provisioning from '../views/Provisioning.vue'
 import WitnessSLA from '../views/WitnessSLA.vue'
 import ConfigEditor from '../views/ConfigEditor.vue'
 import Login from '../views/Login.vue'
 import UserManagement from '../views/UserManagement.vue'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
@@ -31,14 +30,13 @@ const routes = [
   {
     path: '/spokes',
     name: 'Spokes',
-    component: Spokes,
-    meta: { title: 'Spoke 客户端管理', requiresAuth: true },
+    component: SpokeManagement,
+    meta: { title: 'Spoke 管理', requiresAuth: true },
   },
   {
     path: '/managed-spokes',
     name: 'ManagedSpokes',
-    component: ManagedSpokes,
-    meta: { title: 'Spoke 设备管理', requiresAuth: true },
+    redirect: (to) => ({ path: '/spokes', query: { ...to.query, tab: 'managed' } }),
   },
   {
     path: '/provisioning',

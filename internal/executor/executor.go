@@ -178,21 +178,22 @@ type KeyStatusInfo struct {
 }
 
 type SpokeInfo struct {
-	Stale           bool       `json:"stale,omitempty"`
-	ProtocolAddress string     `json:"protocol_address"`
-	NBMAAddress     string     `json:"nbma_address"`
-	NATAddress      string     `json:"nat_address,omitempty"`
-	Interface       string     `json:"interface"`
-	Type            string     `json:"type"` // direct, shadow, static, local
-	Flags           string     `json:"flags"`
-	HoldingTime     int        `json:"holding_time"`
-	ExpiresInSec    int        `json:"expires_in_sec"`
-	LastSeen        *time.Time `json:"last_seen,omitempty"`
-	Alias           string     `json:"alias,omitempty"`
-	SiteName        string     `json:"site_name,omitempty"`
-	ManagedNodeID   string     `json:"managed_node_id,omitempty"`
-	ManagedNodeName string     `json:"managed_node_name,omitempty"`
-	ManagedStatus   string     `json:"managed_status,omitempty"`
+	Stale            bool       `json:"stale,omitempty"`
+	ProtocolAddress  string     `json:"protocol_address"`
+	NBMAAddress      string     `json:"nbma_address"`
+	NATAddress       string     `json:"nat_address,omitempty"`
+	Interface        string     `json:"interface"`
+	Type             string     `json:"type"`                        // direct, shadow, static, local
+	RegistrationMode string     `json:"registration_mode,omitempty"` // ha, legacy; absent when not reported
+	Flags            string     `json:"flags"`
+	HoldingTime      int        `json:"holding_time"`
+	ExpiresInSec     int        `json:"expires_in_sec"`
+	LastSeen         *time.Time `json:"last_seen,omitempty"`
+	Alias            string     `json:"alias,omitempty"`
+	SiteName         string     `json:"site_name,omitempty"`
+	ManagedNodeID    string     `json:"managed_node_id,omitempty"`
+	ManagedNodeName  string     `json:"managed_node_name,omitempty"`
+	ManagedStatus    string     `json:"managed_status,omitempty"`
 }
 
 type InterfaceInfo struct {

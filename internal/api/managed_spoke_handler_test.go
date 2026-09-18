@@ -26,6 +26,49 @@ func managedSpokeTestContext(method, target, body string) (*gin.Context, *httpte
 	return ctx, recorder
 }
 
+func TestManagedSpokeCreateValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	database, err := db.InitDB(filepath.Join(t.TempDir(), "manager.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler := NewManagedSpokeHandler(nil, database)
+	for _, tc := range []struct {
+		name, id, displayName, address, wantError string
+	}{
+		{"missing name", "ctyun", "", "", "显示名称"},
+		{"blank name", "ctyun", "  ", "", "显示名称"},
+		{"long name", "ctyun", strings.Repeat("中", 129), "", "显示名称"},
+		{"invalid id", "bad id", "上海分支 01", "", "节点 ID"},
+		{"invalid IP", "ctyun", "上海分支 01", "bad-ip", "Protocol IP"},
+		{"Chinese name without IP", " ctyun ", " 上海分支 01 ", "", ""},
+		{"maximum name", "branch-2", strings.Repeat("中", 128), "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]string{"id": tc.id, "name": tc.displayName, "protocol_address": tc.address})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, recorder := managedSpokeTestContext(http.MethodPost, "/api/managed-spokes", string(body))
+			handler.Create(ctx)
+			if tc.wantError != "" {
+				if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), tc.wantError) {
+					t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+				}
+				return
+			}
+			if recorder.Code != http.StatusCreated {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+			var name string
+			if err := database.QueryRow(`SELECT name FROM nodes WHERE id=?`, strings.TrimSpace(tc.id)).Scan(&name); err != nil || name != strings.TrimSpace(tc.displayName) {
+				t.Fatalf("stored name=%q err=%v", name, err)
+			}
+		})
+	}
+}
+
 func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	database, err := db.InitDB(filepath.Join(t.TempDir(), "manager.db"))

@@ -1,9 +1,8 @@
 <template>
-  <div class="page-container">
+  <div class="spoke-panel">
     <div class="page-header">
       <div>
-        <h2>Spoke 客户端与分支管理</h2>
-        <span class="sub-title">全网 NHRP 动态注册表、影子复制同步、静态映射与分支状态监控</span>
+        <span class="sub-title">查看所选 Hub 的 NHRP 注册、静态映射与分支接入状态</span>
       </div>
       <n-space>
         <n-button
@@ -83,6 +82,7 @@
             <th style="width: 150px;">NAT 映射地址</th>
             <th style="width: 110px;">隧道接口</th>
             <th style="width: 90px;">注册类型</th>
+            <th style="width: 90px;">接入模式</th>
             <th style="width: 110px;">标志位 (Flags)</th>
             <th style="width: 90px;">租约剩余</th>
             <th style="min-width: 120px;">别名 / 备注</th>
@@ -91,12 +91,12 @@
         </thead>
         <tbody>
           <tr v-if="loading && filteredSpokes.length === 0">
-            <td colspan="9" class="text-center text-muted">
+            <td colspan="10" class="text-center text-muted">
               <n-skeleton text :repeat="3" style="margin: 10px 0;" />
             </td>
           </tr>
           <tr v-else-if="filteredSpokes.length === 0">
-            <td colspan="9" class="text-center text-muted">
+            <td colspan="10" class="text-center text-muted">
               当前节点暂无匹配的 Spoke 客户端
             </td>
           </tr>
@@ -118,6 +118,11 @@
                 :type="s.stale ? 'warning' : s.type === 'direct' || s.type === 'dynamic' ? 'success' : s.type === 'shadow' ? 'info' : 'warning'"
               >
                 {{ s.stale ? `缓存 / ${s.type}` : s.type }}
+              </n-tag>
+            </td>
+            <td>
+              <n-tag size="small" :type="s.registration_mode === 'ha' ? 'info' : 'default'">
+                {{ s.registration_mode === 'ha' ? 'HA' : s.registration_mode === 'legacy' ? 'Legacy' : '未知' }}
               </n-tag>
             </td>
             <td>
@@ -476,7 +481,7 @@ const handleQuickRegister = async () => {
   }
 }
 
-const goManagedSpoke = (id: string) => router.push({ path: '/managed-spokes', query: { node: id } })
+const goManagedSpoke = (id: string) => router.push({ path: '/spokes', query: { tab: 'managed', node: id } })
 
 const copyAgentSettings = async () => {
   await navigator.clipboard.writeText(`SERVER=${managerWSURL}\nNODE_ID=${issuedNodeID.value}\nNODE_TYPE=spoke\nTOKEN=${issuedToken.value}`)
@@ -487,22 +492,11 @@ onMounted(loadSpokes)
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-}
-
-.page-header h2 {
-  margin: 0 0 4px 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-title);
 }
 
 .sub-title {

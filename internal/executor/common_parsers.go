@@ -318,6 +318,10 @@ func ParseSpokeOutput(resp string) []SpokeInfo {
 			current.Interface = val
 		case "type":
 			current.Type = strings.ToLower(val)
+		case "registration-mode":
+			if mode := strings.ToLower(val); mode == "ha" || mode == "legacy" {
+				current.RegistrationMode = mode
+			}
 		case "protocol-address", "protocol":
 			current.ProtocolAddress = val
 		case "nbma-address", "nbma":

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -123,13 +125,13 @@ func (m *NodeManager) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				m.syncAgentMemberNames(ctx)
+				m.syncAgentMetadata(ctx)
 			}
 		}
 	}()
 }
 
-func (m *NodeManager) syncAgentMemberNames(ctx context.Context) {
+func (m *NodeManager) syncAgentMetadata(ctx context.Context) {
 	m.mu.RLock()
 	agentsCopy := make(map[string]*executor.AgentExecutor, len(m.agents))
 	for id, exec := range m.agents {
@@ -138,12 +140,19 @@ func (m *NodeManager) syncAgentMemberNames(ctx context.Context) {
 	m.mu.RUnlock()
 
 	for nodeID, agentExec := range agentsCopy {
-		if agentExec == nil || agentExec.GetNodeType() != "hub" {
+		if agentExec == nil {
 			continue
 		}
 		go func(id string, exec *executor.AgentExecutor) {
 			subCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
+			if exec.GetNodeType() == "spoke" {
+				m.syncSpokeProtocolAddress(subCtx, exec)
+				return
+			}
+			if exec.GetNodeType() != "hub" {
+				return
+			}
 			status, err := exec.GetClusterStatus(subCtx)
 			if err == nil && status != nil && status.Member != "" {
 				var advIP string
@@ -163,6 +172,47 @@ func (m *NodeManager) syncAgentMemberNames(ctx context.Context) {
 				)
 			}
 		}(nodeID, agentExec)
+	}
+}
+
+func (m *NodeManager) syncSpokeProtocolAddress(ctx context.Context, exec executor.NodeExecutor) {
+	ifaces, err := exec.GetInterfaces(ctx)
+	if err != nil {
+		return
+	}
+	var address string
+	for _, iface := range ifaces {
+		if !strings.Contains(" "+iface.Flags+" ", " configured ") {
+			continue
+		}
+		value := strings.TrimSpace(iface.ProtocolAddress)
+		ip, err := netip.ParseAddr(value)
+		if prefix, prefixErr := netip.ParsePrefix(value); prefixErr == nil {
+			ip, err = prefix.Addr(), nil
+		}
+		if err != nil || !ip.IsGlobalUnicast() {
+			continue
+		}
+		// A single node address cannot represent multiple distinct tunnel addresses.
+		if address != "" && address != ip.Unmap().String() {
+			return
+		}
+		address = ip.Unmap().String()
+	}
+	if address == "" {
+		return
+	}
+	result, err := m.database.ExecContext(ctx,
+		`UPDATE nodes SET advertised_ip=?, updated_at=? WHERE id=? AND type='spoke' AND advertised_ip<>?
+		 AND NOT EXISTS (SELECT 1 FROM nodes WHERE type='spoke' AND id<>? AND advertised_ip=?)`,
+		address, time.Now(), exec.GetNodeID(), address, exec.GetNodeID(), address,
+	)
+	if err != nil {
+		log.Printf("[Manager] Sync Spoke protocol address for %s: %v", exec.GetNodeID(), err)
+		return
+	}
+	if count, _ := result.RowsAffected(); count > 0 {
+		m.notifyTopology()
 	}
 }
 

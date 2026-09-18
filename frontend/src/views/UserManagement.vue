@@ -19,6 +19,7 @@
         :bordered="false"
         :single-line="true"
         :scroll-x="600"
+        max-height="min(60vh, 560px)"
         :row-key="(row: UserRecord) => row.id"
       />
     </n-card>

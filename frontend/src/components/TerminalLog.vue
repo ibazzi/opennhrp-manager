@@ -23,7 +23,7 @@
       </div>
     </div>
     <div class="terminal-body-wrapper">
-      <n-scrollbar ref="scrollbarRef" class="terminal-scrollbar" x-scrollable>
+      <n-scrollbar ref="scrollbarRef" class="terminal-scrollbar" x-scrollable trigger="none">
         <div class="terminal-content" :class="{ 'is-nowrap': !isWrap }">
           <div v-if="logs.length === 0" class="empty-tip">
             等待日志流接入 (WebSocket)...
@@ -68,6 +68,7 @@ const isPaused = ref(false)
 const isWrap = ref(false)
 const scrollbarRef = ref<any>(null)
 let ws: WebSocket | null = null
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 
 const toggleWrap = () => {
   isWrap.value = !isWrap.value
@@ -118,7 +119,7 @@ const connectWS = () => {
   ws.onclose = () => {
     const currentToken = localStorage.getItem('opennhrp_token')
     if (currentToken) {
-      setTimeout(connectWS, 3000)
+      reconnectTimer = setTimeout(connectWS, 3000)
     }
   }
 }
@@ -132,7 +133,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(reconnectTimer)
   if (ws) {
+    ws.onclose = null
     ws.close()
     ws = null
   }
@@ -143,8 +146,10 @@ onUnmounted(() => {
 .terminal-container {
   display: flex;
   flex-direction: column;
+  flex: 1;
   height: 100%;
-  min-height: 260px;
+  min-height: 0;
+  box-sizing: border-box;
   background: var(--bg-card, #09090b);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
@@ -154,6 +159,7 @@ onUnmounted(() => {
 }
 
 .terminal-header {
+  flex-shrink: 0;
   background: var(--bg-card-secondary, #18181b);
   padding: 8px 12px;
   display: flex;
@@ -201,7 +207,7 @@ onUnmounted(() => {
 .terminal-body-wrapper {
   flex: 1;
   height: 0;
-  min-height: 200px;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-body, #09090b);
 }

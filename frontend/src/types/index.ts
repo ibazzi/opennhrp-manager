@@ -203,6 +203,7 @@ export interface SpokeInfo {
   nat_address?: string
   interface: string
   type: 'dynamic' | 'direct' | 'shadow' | 'static' | 'local'
+  registration_mode?: 'ha' | 'legacy'
   flags: string
   holding_time: number
   expires_in_sec: number

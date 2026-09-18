@@ -1,7 +1,7 @@
 <template>
   <div class="topology-container" ref="containerRef">
     <div class="canvas-wrapper">
-      <!-- Overlay legend inside topology graph canvas (bottom-left vertical) -->
+      <!-- Mobile legend occupies its own row above the graph. -->
       <div class="legend-overlay">
         <div class="legend-items">
           <span class="legend-badge leader"><span class="dot"></span> 主 Hub</span>
@@ -1139,16 +1139,15 @@ watch(
     padding: 8px;
   }
   .legend-overlay {
-    top: 8px;
-    left: 8px;
-    bottom: auto;
-    right: auto;
+    position: static;
+    flex-shrink: 0;
+    margin: 8px;
     padding: 6px 10px;
   }
   .legend-items {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 12px;
     font-size: 10px;
   }
   .topology-svg {

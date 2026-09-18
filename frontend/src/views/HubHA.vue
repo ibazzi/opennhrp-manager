@@ -154,18 +154,18 @@
     <!-- Members Table -->
     <n-card title="集群 Hub 成员列表 (Members)" class="mb-4">
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" style="min-width: 1280px;">
+        <n-table :bordered="false" :single-line="true" class="members-table">
           <thead>
             <tr>
-              <th style="width: 180px;">Member ID</th>
-              <th style="width: 120px;">HA 实时会话</th>
-              <th style="width: 150px;">Manager Agent</th>
-              <th style="width: 100px;">成员资格</th>
-              <th style="width: 90px;">优先级</th>
-              <th style="width: 170px;">宣告外网地址 (Advertised)</th>
-              <th style="width: 150px;">学习源地址 (Observed)</th>
-              <th style="width: 180px;">复制进度 (Match / Lag)</th>
-              <th style="width: 180px;">操作</th>
+              <th>Member ID</th>
+              <th>HA 会话</th>
+              <th>Manager Agent</th>
+              <th>成员资格</th>
+              <th class="member-priority">优先级</th>
+              <th>宣告地址</th>
+              <th>学习地址</th>
+              <th>复制进度</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -179,9 +179,11 @@
             </tr>
             <tr v-for="m in members" :key="m.member_id">
               <td>
-                <strong>{{ m.member_id }}</strong>
-                <n-tag v-if="m.member_id === cluster?.leader" size="tiny" type="success" class="ml-2">LEADER</n-tag>
-                <n-tag v-else-if="m.member_id === cluster?.primary" size="tiny" type="info" class="ml-2">PRIMARY</n-tag>
+                <div class="member-identity">
+                  <strong>{{ m.member_id }}</strong>
+                  <n-tag v-if="m.member_id === cluster?.leader" size="small" type="success">LEADER</n-tag>
+                  <n-tag v-else-if="m.member_id === cluster?.primary" size="small" type="info">PRIMARY</n-tag>
+                </div>
               </td>
               <td>
                 <n-tag :type="isMemberHAOnline(m) ? 'success' : m.connected ? 'warning' : 'error'" size="small">
@@ -189,31 +191,36 @@
                 </n-tag>
               </td>
               <td>
-                <n-tag v-if="managerNode(m)" :type="managerNode(m)?.status === 'online' ? 'success' : 'error'" size="small">
-                  {{ managerNode(m)?.status === 'online' ? '在线' : '离线' }}
-                </n-tag>
-                <n-tag v-else size="small">未接入</n-tag>
-                <div v-if="managerNode(m)" class="sub-info">{{ formatLastSeen(managerNode(m)?.last_seen) }}</div>
+                <div class="member-detail">
+                  <n-tag v-if="managerNode(m)" :type="managerNode(m)?.status === 'online' ? 'success' : 'error'" size="small">
+                    {{ managerNode(m)?.status === 'online' ? '在线' : '离线' }}
+                  </n-tag>
+                  <n-tag v-else size="small">未接入</n-tag>
+                  <div v-if="managerNode(m)" class="sub-info">{{ formatLastSeen(managerNode(m)?.last_seen) }}</div>
+                </div>
               </td>
               <td>
                 <n-tag :type="m.state === 'active' ? 'success' : m.state === 'learner' ? 'warning' : 'error'" size="small">{{ m.state }}</n-tag>
               </td>
-              <td>{{ m.priority }}</td>
+              <td class="member-priority">{{ m.priority }}</td>
               <td>
-                <code v-for="ip in m.advertised_addresses" :key="ip" class="mr-1">{{ ip }}</code>
-                <span v-if="!m.advertised_addresses?.length" class="text-muted">-</span>
+                <div class="member-detail member-addresses">
+                  <code v-for="ip in m.advertised_addresses" :key="ip">{{ ip }}</code>
+                  <span v-if="!m.advertised_addresses?.length" class="text-muted">—</span>
+                </div>
               </td>
-              <td><code>{{ m.observed_address || '-' }}</code></td>
+              <td class="member-addresses"><code v-if="m.observed_address">{{ m.observed_address }}</code><span v-else class="text-muted">—</span></td>
               <td>
-                <span v-if="m.member_id === cluster?.leader">Leader Idx: {{ m.match_index ?? 0 }}</span>
-                <span v-else>Idx: {{ m.match_index ?? 0 }} (Lag: {{ m.lag ?? 0 }})</span>
-                <div class="sub-info">Digest: {{ shortValue(replicationDigest(m.member_id)) }}</div>
+                <div class="member-detail member-replication">
+                  <span>索引 {{ m.match_index ?? 0 }}<span v-if="m.member_id !== cluster?.leader" class="member-lag" :class="{ 'text-amber': (m.lag ?? 0) > 0 }">落后 {{ m.lag ?? 0 }}</span></span>
+                  <div class="sub-info" :title="replicationDigest(m.member_id)">Digest: {{ shortValue(replicationDigest(m.member_id)) }}</div>
+                </div>
               </td>
               <td>
-                <n-space>
-                  <n-button size="tiny" secondary :disabled="!store.isAdmin" @click="openEditPriority(m)">修改优先级</n-button>
-                  <n-button size="tiny" :type="m.state === 'disabled' ? 'success' : 'error'" secondary :disabled="!store.isAdmin" @click="handleSetMemberDisabled(m.member_id, m.state !== 'disabled')">{{ m.state === 'disabled' ? '启用' : '禁用' }}</n-button>
-                </n-space>
+                <div class="member-actions">
+                  <n-button size="small" secondary :disabled="!store.isAdmin" @click="openEditPriority(m)">修改优先级</n-button>
+                  <n-button size="small" :type="m.state === 'disabled' ? 'success' : 'error'" secondary :disabled="!store.isAdmin" @click="handleSetMemberDisabled(m.member_id, m.state !== 'disabled')">{{ m.state === 'disabled' ? '启用' : '禁用' }}</n-button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -717,6 +724,52 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.members-table {
+  min-width: 1380px;
+}
+
+.members-table th, .members-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.member-identity, .member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.member-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.member-addresses code {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.members-table .member-priority {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.member-replication {
+  font-variant-numeric: tabular-nums;
+}
+
+.member-lag {
+  margin-left: 12px;
+  color: var(--text-muted);
+}
+
+.member-lag.text-amber {
+  color: #f59e0b;
+}
+
 .page-container {
   padding: 24px;
 }

@@ -1,8 +1,7 @@
 <template>
-  <div class="page-container">
+  <div class="spoke-panel">
     <div class="page-header">
       <div>
-        <h2>Spoke 设备管理</h2>
         <span class="sub-title">独立 Agent 纳管、运行状态、Hub peer、配置与日志</span>
       </div>
       <n-space>
@@ -18,7 +17,7 @@
           <tbody>
             <tr v-if="spokes.length === 0"><td colspan="8" class="empty">暂无已登记的 Spoke</td></tr>
             <tr v-for="spoke in spokes" :key="spoke.id" :class="{ selected: selectedId === spoke.id }" @click="selectSpoke(spoke.id)">
-              <td><strong>{{ spoke.name }}</strong><br><code>{{ spoke.id }}</code></td>
+              <td class="spoke-identity"><strong>{{ spoke.name }}</strong> <code>{{ spoke.id }}</code></td>
               <td><code>{{ spoke.protocol_address || '-' }}</code></td>
               <td><n-tag size="small" :type="spoke.status === 'online' ? 'success' : 'default'">{{ spoke.status === 'online' ? '在线' : '离线' }}</n-tag></td>
               <td><n-tag size="small" :type="spoke.core_available ? 'success' : 'error'">{{ spoke.core_available ? '可用' : '不可用' }}</n-tag></td>
@@ -47,7 +46,7 @@
     <template v-if="selected">
       <n-grid :cols="2" :x-gap="16" :y-gap="16" responsive="screen" item-responsive class="mb-4">
         <n-grid-item span="2 m:1">
-          <n-card title="OpenNHRP 接口">
+          <n-card title="OpenNHRP 接口" class="peer-summary-card">
             <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 520px">
               <thead><tr><th>名称</th><th>Protocol IP</th><th>NBMA</th><th>MTU</th></tr></thead>
               <tbody>
@@ -58,7 +57,7 @@
           </n-card>
         </n-grid-item>
         <n-grid-item span="2 m:1">
-          <n-card title="当前 Hub / NHRP peers">
+          <n-card title="当前 Hub / NHRP peers" class="peer-summary-card">
             <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 520px">
               <thead><tr><th>Protocol IP</th><th>NBMA</th><th>接口</th><th>类型</th><th>租约</th></tr></thead>
               <tbody>
@@ -139,16 +138,16 @@
         </n-space>
       </n-card>
 
-      <n-card title="节点实时日志" class="log-card">
+      <n-card title="节点实时日志" class="log-card" content-style="min-height: 0; display: flex; flex-direction: column;">
         <terminal-log :node-id="selected.id" :title="`${selected.name} / ${selected.id}`" />
       </n-card>
     </template>
 
     <n-modal v-model:show="showCreate" preset="card" title="登记 Spoke" style="width: 480px; max-width: calc(100vw - 32px)">
       <n-form label-placement="left" label-width="90">
-        <n-form-item label="节点 ID"><n-input v-model:value="createForm.id" placeholder="branch-shanghai-01" /></n-form-item>
-        <n-form-item label="显示名称"><n-input v-model:value="createForm.name" placeholder="上海分支 01" /></n-form-item>
-        <n-form-item label="Protocol IP"><n-input v-model:value="createForm.protocol_address" placeholder="可选，用于关联 Hub 注册表" /></n-form-item>
+        <n-form-item label="节点 ID" required><n-input v-model:value="createForm.id" placeholder="必填，如 branch-shanghai-01" /></n-form-item>
+        <n-form-item label="显示名称" required><n-input v-model:value="createForm.name" placeholder="必填，如 上海分支 01" /></n-form-item>
+        <n-form-item label="Protocol IP"><n-input v-model:value="createForm.protocol_address" placeholder="Agent 自动获取，也可预填" /></n-form-item>
       </n-form>
       <template #footer><n-space justify="end"><n-button @click="showCreate = false">取消</n-button><n-button type="primary" @click="createSpoke">创建</n-button></n-space></template>
     </n-modal>
@@ -187,6 +186,7 @@ const modeChanging = ref('')
 const createForm = ref({ id: '', name: '', protocol_address: '' })
 const selected = computed(() => spokes.value.find((item) => item.id === selectedId.value))
 let refreshTimer: number | undefined
+let disposed = false
 
 const formatTime = (value?: string) => value ? new Date(value).toLocaleString() : '-'
 
@@ -247,6 +247,15 @@ const showIssuedToken = (token: string) => {
 }
 
 const createSpoke = async () => {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(createForm.value.id.trim())) {
+    message.error('节点 ID 必须为 1–64 个字符，以英文字母或数字开头，仅允许英文字母、数字、点、下划线和连字符')
+    return
+  }
+  const nameLength = [...createForm.value.name.trim()].length
+  if (nameLength === 0 || nameLength > 128) {
+    message.error('显示名称不能为空，且不能超过 128 个字符')
+    return
+  }
   try {
     const result = await api.createManagedSpoke(createForm.value)
     showCreate.value = false
@@ -308,30 +317,35 @@ onMounted(async () => {
   await loadSpokes()
   const requestedNode = typeof route.query.node === 'string' ? route.query.node : ''
   if (requestedNode && spokes.value.some((item) => item.id === requestedNode)) await selectSpoke(requestedNode)
+  if (disposed) return
   refreshTimer = window.setInterval(async () => {
     await loadSpokes()
     if (selectedId.value) await loadHAStatus(selectedId.value)
   }, 3000)
 })
-onUnmounted(() => refreshTimer && window.clearInterval(refreshTimer))
+onUnmounted(() => {
+  disposed = true
+  if (refreshTimer) window.clearInterval(refreshTimer)
+})
 </script>
 
 <style scoped>
-.page-container { padding: 24px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
-.page-header h2 { margin: 0; font-size: 20px; color: var(--text-title); }
 .sub-title, .empty { color: var(--text-muted); }
 .empty { text-align: center; padding: 18px; }
 .mb-4 { margin-bottom: 16px; }
+.peer-summary-card { height: 100%; }
 .mt-2 { margin-top: 8px; }
 .ml-1 { margin-left: 4px; }
 .ha-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; color: var(--text-muted); }
 tbody tr { cursor: pointer; }
+.spoke-identity { white-space: nowrap; }
+.spoke-identity strong, .spoke-identity code { vertical-align: middle; }
+.spoke-identity code { margin-left: 8px; }
 tbody tr.selected { background: var(--bg-card-secondary); }
 .config-editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
 .log-card { height: 520px; }
 @media (max-width: 768px) {
-  .page-container { padding: 12px; }
   .page-header { align-items: stretch; flex-direction: column; }
   .page-header .n-space, .page-header .n-button { width: 100%; }
 }
