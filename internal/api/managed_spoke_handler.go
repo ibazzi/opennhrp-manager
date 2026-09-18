@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 )
 
 var managedSpokeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+var managedHAMemberID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
 
 type ManagedSpokeHandler struct {
 	nodeMgr  *service.NodeManager
@@ -279,4 +281,47 @@ func (h *ManagedSpokeHandler) HA(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, status)
+}
+
+func (h *ManagedSpokeHandler) SetHAMode(c *gin.Context) {
+	id := c.Param("id")
+	var nodeType string
+	var req struct {
+		Mode   string `json:"mode" binding:"required"`
+		Member string `json:"member"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil ||
+		(req.Mode != "auto" && req.Mode != "manual") ||
+		(req.Mode == "auto" && req.Member != "") ||
+		(req.Mode == "manual" && !managedHAMemberID.MatchString(req.Member)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "mode must be auto or manual with a valid member"})
+		return
+	}
+	if err := h.database.QueryRow(`SELECT type FROM nodes WHERE id=?`, id).Scan(&nodeType); err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "managed spoke not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	if nodeType != "spoke" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node is not a managed spoke"})
+		return
+	}
+	exec, err := h.nodeMgr.GetExecutor(id)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+	if err := exec.SetHAMode(c.Request.Context(), req.Mode, req.Member); err != nil {
+		var commandError *executor.AgentCommandError
+		if errors.As(err, &commandError) {
+			c.JSON(http.StatusConflict, gin.H{"error": commandError.Detail})
+		} else {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

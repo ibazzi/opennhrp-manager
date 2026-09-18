@@ -91,6 +91,10 @@ type HAStatusInfo struct {
 	HubListGeneration   uint64            `json:"hub_list_generation,omitempty"`
 	HubListSource       string            `json:"hub_list_source,omitempty"`
 	Switching           bool              `json:"switching,omitempty"`
+	SelectionMode       string            `json:"selection_mode"`
+	ManualMember        *string           `json:"manual_member,omitempty"`
+	ManualLeader        *string           `json:"manual_leader,omitempty"`
+	ManualSuspended     bool              `json:"manual_suspended"`
 	AuthMode            string            `json:"auth_mode"`
 	AuthClusterID       string            `json:"auth_cluster_id,omitempty"`
 	SeenTerm            uint64            `json:"seen_term,omitempty"`
@@ -213,6 +217,7 @@ type NodeExecutor interface {
 	// OpenNHRP HA Cluster Management
 	GetClusterStatus(ctx context.Context) (*ClusterStatusInfo, error)
 	GetHAStatus(ctx context.Context, iface string) (*HAStatusInfo, error)
+	SetHAMode(ctx context.Context, mode, member string) error
 	GetReplicationStatus(ctx context.Context) (*ReplicationStatusInfo, error)
 	GetMembers(ctx context.Context) ([]MemberInfo, error)
 	SetMember(ctx context.Context, memberID string, priority int, disabled *bool, remove bool) error

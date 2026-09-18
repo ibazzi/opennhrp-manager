@@ -156,6 +156,26 @@ func (a *AgentExecutor) GetHAStatus(ctx context.Context, iface string) (*HAStatu
 	return ParseHAStatusFromJSON(resp.RawText)
 }
 
+func (a *AgentExecutor) SetHAMode(ctx context.Context, mode, member string) error {
+	command := "ha mode auto\n"
+	if mode == "manual" {
+		if member == "" || len(member) > 63 || strings.ContainsAny(member, " \t\r\n") {
+			return fmt.Errorf("invalid HA member")
+		}
+		command = fmt.Sprintf("ha mode manual %s\n", member)
+	} else if mode != "auto" {
+		return fmt.Errorf("invalid HA mode")
+	}
+	resp, err := a.sendCommand(ctx, "opennhrp", command, nil)
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(resp.RawText, "Status: ok\n") {
+		return &AgentCommandError{Detail: strings.TrimSpace(resp.RawText)}
+	}
+	return nil
+}
+
 func (a *AgentExecutor) GetReplicationStatus(ctx context.Context) (*ReplicationStatusInfo, error) {
 	resp, err := a.sendCommand(ctx, "opennhrp-ha", "ha replication show --format json\n", nil)
 	if err != nil {

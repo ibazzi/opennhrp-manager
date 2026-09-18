@@ -74,16 +74,32 @@
         <div class="ha-summary">
           <span>接口: <code>{{ haStatus.interface }}</code></span>
           <span>当前 Hub: <code>{{ haStatus.active_member || '-' }}</code></span>
+          <span>选择模式:
+            <n-tag size="small" :type="haStatus.selection_mode === 'manual' ? 'warning' : 'info'">
+              {{ haStatus.selection_mode === 'manual' ? (haStatus.manual_suspended ? '手动（HA 接管中）' : '手动') : '自动' }}
+            </n-tag>
+          </span>
+          <span v-if="haStatus.selection_mode === 'manual'">手动目标: <code>{{ haStatus.manual_member }}</code></span>
           <span>协调器: {{ haStatus.coordinator_state }}</span>
           <span>切换: {{ haStatus.switching ? '进行中' : '稳定' }}</span>
+          <n-popconfirm v-if="haStatus.selection_mode === 'manual'" :disabled="!store.isAdmin || !!modeChanging" @positive-click="setHAMode('auto')">
+            <template #trigger>
+              <n-button size="tiny" secondary :loading="modeChanging === 'auto'" :disabled="!store.isAdmin || !!modeChanging">恢复自动</n-button>
+            </template>
+            清除手动目标并恢复现有自动评分切换策略？
+          </n-popconfirm>
         </div>
         <n-scrollbar x-scrollable>
-          <n-table size="small" :bordered="false" style="min-width: 760px">
-            <thead><tr><th>Hub</th><th>状态</th><th>Selected endpoint</th><th>RTT</th><th>Loss</th><th>Score</th><th>Term / Leader</th></tr></thead>
+          <n-table size="small" :bordered="false" style="min-width: 880px">
+            <thead><tr><th>Hub</th><th>状态</th><th>Selected endpoint</th><th>RTT</th><th>Loss</th><th>Score</th><th>Term / Leader</th><th>操作</th></tr></thead>
             <tbody>
-              <tr v-if="haStatus.candidates.length === 0"><td colspan="7" class="empty">暂无 Hub 候选</td></tr>
+              <tr v-if="haStatus.candidates.length === 0"><td colspan="8" class="empty">暂无 Hub 候选</td></tr>
               <tr v-for="candidate in haStatus.candidates" :key="candidate.member">
-                <td><strong>{{ candidate.member }}</strong><span v-if="candidate.active">（当前）</span></td>
+                <td>
+                  <strong>{{ candidate.member }}</strong>
+                  <n-tag v-if="candidate.active" size="small" type="success" class="ml-1">当前</n-tag>
+                  <n-tag v-if="haStatus.manual_member === candidate.member" size="small" type="warning" class="ml-1">手动目标</n-tag>
+                </td>
                 <td>
                   <n-tag size="small" :type="candidate.ready ? 'success' : candidate.state === 'suspect' ? 'warning' : 'default'">{{ candidate.state }}
                   </n-tag>
@@ -96,6 +112,19 @@
                   </n-tag>
                 </td>
                 <td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td>
+                <td>
+                  <span v-if="candidate.active || haStatus.manual_member === candidate.member">-</span>
+                  <n-popconfirm v-else :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated" @positive-click="setHAMode('manual', candidate.member)">
+                    <template #trigger>
+                      <n-button size="tiny" secondary type="warning"
+                        :loading="modeChanging === candidate.member"
+                        :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated">
+                        设为手动目标
+                      </n-button>
+                    </template>
+                    将当前 Spoke 手动切换到 {{ candidate.member }}？Hub HA 接管期间会临时服从 HA，回切后恢复此目标。
+                  </n-popconfirm>
+                </td>
               </tr>
             </tbody>
           </n-table>
@@ -154,6 +183,7 @@ const saving = ref(false)
 const showCreate = ref(false)
 const showToken = ref(false)
 const issuedToken = ref('')
+const modeChanging = ref('')
 const createForm = ref({ id: '', name: '', protocol_address: '' })
 const selected = computed(() => spokes.value.find((item) => item.id === selectedId.value))
 let refreshTimer: number | undefined
@@ -190,6 +220,24 @@ const loadHAStatus = async (id: string) => {
     haStatus.value = await api.getManagedSpokeHA(id, iface)
   } catch {
     haStatus.value = null
+  }
+}
+
+const setHAMode = async (mode: 'auto' | 'manual', member = '') => {
+  modeChanging.value = mode === 'auto' ? 'auto' : member
+  try {
+    await api.setManagedSpokeHAMode(selectedId.value, mode, member)
+    message.success(mode === 'auto' ? '已恢复自动选择' : `已将 ${member} 设为手动目标`)
+    await loadHAStatus(selectedId.value)
+    try {
+      peers.value = await api.listManagedSpokePeers(selectedId.value)
+    } catch {
+      // HA 状态已经刷新，peer 列表由下一轮刷新补齐。
+    }
+  } catch (error: any) {
+    message.error(error.response?.data?.error || '切换 Hub 模式失败')
+  } finally {
+    modeChanging.value = ''
   }
 }
 
@@ -276,6 +324,7 @@ onUnmounted(() => refreshTimer && window.clearInterval(refreshTimer))
 .empty { text-align: center; padding: 18px; }
 .mb-4 { margin-bottom: 16px; }
 .mt-2 { margin-top: 8px; }
+.ml-1 { margin-left: 4px; }
 .ha-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; color: var(--text-muted); }
 tbody tr { cursor: pointer; }
 tbody tr.selected { background: var(--bg-card-secondary); }

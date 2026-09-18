@@ -116,6 +116,10 @@ export interface HAStatus {
   hub_list_generation?: number
   hub_list_source?: string
   switching?: boolean
+  selection_mode: 'auto' | 'manual'
+  manual_member?: string
+  manual_leader?: string
+  manual_suspended: boolean
   auth_mode: string
   auth_cluster_id?: string
   seen_term?: number

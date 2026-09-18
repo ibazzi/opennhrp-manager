@@ -161,6 +161,9 @@ export const api = {
   getManagedSpokeHA: (id: string, iface = '') =>
     http.get<HAStatus>(`/managed-spokes/${encodeURIComponent(id)}/ha`, { params: { interface: iface } }).then((r) => r.data),
 
+  setManagedSpokeHAMode: (id: string, mode: 'auto' | 'manual', member = '') =>
+    http.post(`/managed-spokes/${encodeURIComponent(id)}/ha/mode`, member ? { mode, member } : { mode }),
+
   // Witness & SLA
   getSLAMatrix: () =>
     http.get<SLAMatrixItem[]>('/witness/sla').then((r) => r.data),

@@ -92,6 +92,25 @@ func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 		t.Fatalf("plain token rotation failed after binding: status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 
+	ctx, recorder = managedSpokeTestContext(http.MethodPost, "/api/managed-spokes/branch-1/ha/mode", `{"mode":"manual","member":"bad member"}`)
+	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
+	handler.SetHAMode(ctx)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid HA member accepted: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	ctx, recorder = managedSpokeTestContext(http.MethodPost, "/api/managed-spokes/branch-1/ha/mode", `{"mode":"auto","member":"hub-primary"}`)
+	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
+	handler.SetHAMode(ctx)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("auto mode accepted a member: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	ctx, recorder = managedSpokeTestContext(http.MethodPost, "/api/managed-spokes/branch-1/ha/mode", `{"mode":"manual","member":"hub-primary"}`)
+	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
+	handler.SetHAMode(ctx)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("offline managed Spoke mode change status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+
 	ctx, recorder = managedSpokeTestContext(http.MethodDelete, "/api/managed-spokes/branch-1", "")
 	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
 	handler.Delete(ctx)
