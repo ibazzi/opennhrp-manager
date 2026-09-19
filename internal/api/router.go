@@ -15,7 +15,6 @@ func SetupRouter(
 	database *db.DB,
 	nodeMgr *service.NodeManager,
 	witnessSvc *service.WitnessService,
-	provService *service.ProvisioningService,
 	logHub *service.LogHub,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -37,7 +36,7 @@ func SetupRouter(
 	authHandler := NewAuthHandler(database, cfg.JWTSecret)
 	userHandler := NewUserHandler(database)
 	clusterHandler := NewClusterHandler(nodeMgr, database)
-	spokeHandler := NewSpokeHandler(nodeMgr, database, provService)
+	spokeHandler := NewSpokeHandler(nodeMgr, database)
 	witnessHandler := NewWitnessHandler(witnessSvc, database)
 	configHandler := NewConfigHandler(nodeMgr, database)
 	managedSpokeHandler := NewManagedSpokeHandler(nodeMgr, database)
@@ -106,8 +105,6 @@ func SetupRouter(
 				spokeGroup.POST("/nbma/update", adminOnly, spokeHandler.UpdateNBMA)
 				spokeGroup.POST("/redirect/purge", adminOnly, spokeHandler.PurgeRedirect)
 				spokeGroup.POST("/metadata", adminOnly, spokeHandler.SetSpokeMetadata)
-				spokeGroup.POST("/provision/generate", adminOnly, spokeHandler.GenerateSpokeConfig)
-				spokeGroup.POST("/provision/download", adminOnly, spokeHandler.DownloadSpokePackage)
 			}
 
 			managedSpokeGroup := protected.Group("/managed-spokes")

@@ -195,7 +195,6 @@ import {
   darkTheme,
 } from 'naive-ui'
 import {
-  ConstructOutline,
   EyeOutline,
   GitNetworkOutline,
   KeyOutline,
@@ -301,11 +300,6 @@ const menuOptions = computed(() => {
       label: 'Spoke 管理',
       key: '/spokes',
       icon: renderIcon(PulseOutline),
-    },
-    {
-      label: 'Spoke 配置生成向导',
-      key: '/provisioning',
-      icon: renderIcon(ConstructOutline),
     },
     {
       label: 'Witness 仲裁与 SLA',
@@ -505,8 +499,10 @@ code {
   vertical-align: 0 !important;
 }
 
-/* All tables unified: clean horizontal lines, NO vertical divider lines, no wrapping by default, GLOBAL STICKY HEADER */
+/* Fixed table layout with wrapping content and sticky headers. */
 .n-table {
+  table-layout: fixed;
+  width: 100%;
   border: none !important;
   overflow: visible;
 }
@@ -528,7 +524,8 @@ code {
   border-right: none !important;
   border-left: none !important;
   border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   box-shadow: 0 1px 0 var(--border-color) !important;
 }
 
@@ -536,7 +533,8 @@ code {
   border-right: none !important;
   border-left: none !important;
   border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .n-table td.allow-wrap,
@@ -554,7 +552,8 @@ code {
   border-right: none !important;
   border-left: none !important;
   border-bottom: 1px solid var(--border-color) !important;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   box-shadow: 0 1px 0 var(--border-color) !important;
 }
 

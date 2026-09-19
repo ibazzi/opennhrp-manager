@@ -110,7 +110,7 @@
               <n-table size="small" :bordered="false" :single-line="true" class="side-table" style="min-width: 320px;">
                 <thead>
                   <tr>
-                    <th style="width: 140px;">目标单播 IP</th>
+                    <th>目标单播 IP</th>
                     <th style="width: 80px;">状态</th>
                     <th style="width: 90px;">探测间隔</th>
                   </tr>
@@ -146,7 +146,7 @@
                 <thead>
                   <tr>
                     <th style="width: 130px;">Protocol IP</th>
-                    <th style="width: 140px;">NBMA 外网物理 IP</th>
+                    <th>NBMA 外网物理 IP</th>
                     <th style="width: 70px;">类型</th>
                     <th style="width: 80px;">租约剩余</th>
                   </tr>

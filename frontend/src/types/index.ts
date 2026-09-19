@@ -273,6 +273,7 @@ export interface SLAMatrixItem {
   node_id: string
   avg_rtt_ms: number
   loss_rate: number
+  loss_samples: number
   l3_healthy: boolean
   l4_healthy: boolean
   agent_healthy?: boolean

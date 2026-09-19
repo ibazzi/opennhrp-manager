@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -75,6 +76,13 @@ func (h *AgentWSHandler) HandleWS(c *gin.Context) {
 
 	log.Printf("[AgentWS] Agent connected: %s from %s", nodeID, conn.RemoteAddr())
 
+	// Ping and Pong state is owned by this connection's read loop.
+	var latency agentWSLatency
+	conn.SetPongHandler(func(payload string) error {
+		latency.pong(payload, time.Now())
+		return nil
+	})
+
 	for {
 		var env protocol.Envelope
 		err := conn.ReadJSON(&env)
@@ -89,7 +97,14 @@ func (h *AgentWSHandler) HandleWS(c *gin.Context) {
 			if b, err := json.Marshal(env.Payload); err == nil {
 				if err := json.Unmarshal(b, &hb); err == nil {
 					hb.NodeType = nodeType
-					h.nodeMgr.UpdateHeartbeat(nodeID, hb)
+					loss, samples := latency.loss(time.Now())
+					h.nodeMgr.UpdateHeartbeat(nodeID, hb, latency.rtt(time.Now()), loss, samples)
+					now := time.Now()
+					if payload := latency.ping(now); payload != "" {
+						if err := conn.WriteControl(websocket.PingMessage, []byte(payload), now.Add(time.Second)); err != nil {
+							return
+						}
+					}
 				}
 			}
 

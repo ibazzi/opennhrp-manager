@@ -158,14 +158,14 @@
           <thead>
             <tr>
               <th>Member ID</th>
-              <th>HA 会话</th>
-              <th>Manager Agent</th>
-              <th>成员资格</th>
-              <th class="member-priority">优先级</th>
-              <th>宣告地址</th>
-              <th>学习地址</th>
-              <th>复制进度</th>
-              <th>操作</th>
+              <th style="width: 120px;">HA 会话</th>
+              <th style="width: 170px;">Manager Agent</th>
+              <th style="width: 110px;">成员资格</th>
+              <th class="member-priority" style="width: 90px;">优先级</th>
+              <th style="width: 180px;">宣告地址</th>
+              <th style="width: 180px;">学习地址</th>
+              <th style="width: 210px;">复制进度</th>
+              <th style="width: 210px;">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -235,7 +235,7 @@
           <thead>
             <tr>
               <th style="width: 120px;">ID 前缀</th>
-              <th style="width: 150px;">目标 Member ID</th>
+              <th>目标 Member ID</th>
               <th style="width: 100px;">预设优先级</th>
               <th style="width: 90px;">状态</th>
               <th style="width: 170px;">过期时间</th>
@@ -725,7 +725,7 @@ onUnmounted(() => {
 
 <style scoped>
 .members-table {
-  min-width: 1380px;
+  min-width: 1500px;
 }
 
 .members-table th, .members-table td {
@@ -737,7 +737,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  white-space: nowrap;
+  flex-wrap: wrap;
 }
 
 .member-detail {
@@ -749,7 +749,7 @@ onUnmounted(() => {
 
 .member-addresses code {
   display: inline-block;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .members-table .member-priority {

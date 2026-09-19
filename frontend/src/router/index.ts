@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import HubHA from '../views/HubHA.vue'
 import SpokeManagement from '../views/SpokeManagement.vue'
-import Provisioning from '../views/Provisioning.vue'
 import WitnessSLA from '../views/WitnessSLA.vue'
 import ConfigEditor from '../views/ConfigEditor.vue'
 import Login from '../views/Login.vue'
@@ -37,12 +36,6 @@ const routes: RouteRecordRaw[] = [
     path: '/managed-spokes',
     name: 'ManagedSpokes',
     redirect: (to) => ({ path: '/spokes', query: { ...to.query, tab: 'managed' } }),
-  },
-  {
-    path: '/provisioning',
-    name: 'Provisioning',
-    component: Provisioning,
-    meta: { title: 'Spoke 配置向导', requiresAuth: true },
   },
   {
     path: '/witness',

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"opennhrp-manager/internal/config"
+	"opennhrp-manager/internal/db"
 	"opennhrp-manager/internal/executor"
 	"opennhrp-manager/internal/protocol"
 )
@@ -24,7 +25,12 @@ func TestHeartbeatPublishesTopologySnapshot(t *testing.T) {
 	mgr.UpdateHeartbeat("hub-primary", protocol.HeartbeatPayload{
 		ClusterStatus: cluster,
 		Spokes:        spokes,
-	})
+		Timestamp:     time.Now().Add(-time.Hour),
+	}, 56, 0, 1)
+	tel, _ := mgr.GetNodeTelemetry("hub-primary")
+	if tel.WSRttMs != 56 {
+		t.Fatalf("RTT must ignore Agent clock: %v", tel.WSRttMs)
+	}
 
 	select {
 	case <-updates:
@@ -38,5 +44,12 @@ func TestHeartbeatPublishesTopologySnapshot(t *testing.T) {
 	gotSpokes, ok := mgr.GetCachedSpokes("hub-primary", "")
 	if !ok || len(gotSpokes) != 1 || gotSpokes[0].ProtocolAddress != "10.20.0.2/32" || gotSpokes[0].Alias != "branch-a" {
 		t.Fatalf("unexpected spoke snapshot: %#v", gotSpokes)
+	}
+}
+
+func TestUnavailableWSLatencyDoesNotReuseStoredRTT(t *testing.T) {
+	summary := SummarizeNodeSLA("hub", nil, db.NodeRecord{WSRttMs: 80.57}, AgentTelemetry{}, true, true)
+	if summary.LatencySource != "ws" || summary.AvgRttMs != 0 {
+		t.Fatalf("unavailable measurement reused stored RTT: %+v", summary)
 	}
 }

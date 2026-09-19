@@ -104,7 +104,7 @@ func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 		t.Fatalf("token was not hashed: %q", stored)
 	}
 	observed := []executor.SpokeInfo{{ProtocolAddress: "10.20.0.2/24"}}
-	NewSpokeHandler(nodeMgr, database, nil).attachManagedSpokes(observed)
+	NewSpokeHandler(nodeMgr, database).attachManagedSpokes(observed)
 	if observed[0].ManagedNodeID != "branch-1" || observed[0].ManagedStatus != "offline" {
 		t.Fatalf("Hub-observed Spoke was not linked to managed device: %#v", observed[0])
 	}

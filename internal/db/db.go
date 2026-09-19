@@ -387,7 +387,8 @@ func (d *DB) GetProbes(targetNodeID, probeType string, hours, maxPoints int) ([]
 			MAX(CASE WHEN success = 0 THEN 1.0 ELSE loss_rate END) AS max_loss,
 			MIN(success) AS all_success
 		FROM witness_probes
-		WHERE recorded_at >= ?`
+		WHERE recorded_at >= ?
+		AND NOT (probe_type IN ('l3_nbma', 'l4_port') AND success = 1 AND lower(detail) LIKE '%firewall%')`
 	args := []interface{}{cutoff}
 
 	if targetNodeID != "" && targetNodeID != "all" {

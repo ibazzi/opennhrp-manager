@@ -18,7 +18,8 @@
         :loading="loading"
         :bordered="false"
         :single-line="true"
-        :scroll-x="600"
+        :scroll-x="760"
+        table-layout="fixed"
         max-height="min(60vh, 560px)"
         :row-key="(row: UserRecord) => row.id"
       />
@@ -268,7 +269,7 @@ const columns: DataTableColumns<UserRecord> = [
   {
     title: '用户名',
     key: 'username',
-    width: 150,
+    ellipsis: { tooltip: true },
     render(row) {
       const isSelf = store.currentUser?.id === row.id
       return h('div', { class: 'user-name-cell' }, [

@@ -8,25 +8,6 @@
       <n-button secondary @click="loadData">刷新监测数据</n-button>
     </div>
 
-    <n-alert :type="quorumAlertType" :title="quorumTitle" class="mb-4">
-      <div class="quorum-summary">
-        <span>{{ quorum?.decision_reason || '等待兼容 Agent 状态' }}</span>
-        <n-tag v-if="quorum?.mode === 'active' || quorum?.policy === 'hub-majority'" size="small" :type="quorumHealthy ? 'success' : 'error'">
-          {{ quorum.votes }}/{{ quorum.voters }} · {{ quorum.policy === 'hub-majority' ? 'Hub votes' : `Holder ${quorum.holder || '-'} · ${((quorum.lease_remaining_ms || 0) / 1000).toFixed(1)}s` }}
-        </n-tag>
-      </div>
-      <div v-if="quorum?.members?.length" class="quorum-members">
-        <n-tag
-          v-for="member in quorum.members"
-          :key="member.node_id"
-          size="small"
-          :type="member.fenced || !member.fresh ? 'error' : member.quorum_available ? 'success' : 'warning'"
-        >
-          {{ member.member_id || member.node_id }} · peer={{ member.peer_vote ? 'yes' : 'no' }} · manager={{ member.manager_vote ? 'yes' : 'no' }}{{ member.fenced ? ' · FENCED' : '' }}
-        </n-tag>
-      </div>
-    </n-alert>
-
     <!-- Node SLA Matrix Cards -->
     <n-grid cols="1 s:2 m:3" responsive="screen" :x-gap="16" :y-gap="16" class="mb-4">
       <template v-if="loading && slaList.length === 0">
@@ -71,20 +52,20 @@
             <div class="sla-metrics">
               <div class="metric-item">
                 <span class="m-label">
-                  平均延迟
+                  {{ item.latency_source === 'ws' ? '往返延迟' : '平均延迟' }}
                   <span style="font-size: 10px; color: var(--text-muted);">
-                    ({{ item.latency_source === 'ws' ? 'WS 遥测' : 'ICMP' }})
+                    ({{ item.latency_source === 'ws' ? 'WS Ping/Pong' : 'ICMP' }})
                   </span>
                 </span>
-                <span class="m-val">{{ (item.avg_rtt_ms || 0).toFixed(2) }} ms</span>
+                <span class="m-val">{{ item.avg_rtt_ms > 0 ? `${item.avg_rtt_ms.toFixed(2)} ms` : '—' }}</span>
               </div>
               <div class="metric-item">
                 <span class="m-label">
-                  丢包率
-                  <span v-if="item.firewall_protected" style="font-size: 10px; color: var(--text-muted);">(心跳在网)</span>
+                  {{ item.latency_source === 'ws' ? '探测超时率' : '丢包率' }}
+                  <span style="font-size: 10px; color: var(--text-muted);">{{ item.latency_source === 'ws' ? '(最近 20 次，超时 5s)' : '(最近 10 条记录)' }}</span>
                 </span>
-                <span class="m-val" :class="{ 'text-error': !item.firewall_protected && (item.loss_rate || 0) > 0 }">
-                  {{ ((item.loss_rate || 0) * 100).toFixed(1) }}%
+                <span class="m-val" :class="{ 'text-error': item.loss_samples > 0 && item.loss_rate > 0 }">
+                  {{ item.loss_samples > 0 ? `${(item.loss_rate * 100).toFixed(1)}%` : '—' }}
                 </span>
               </div>
               <div v-if="item.active_spokes !== undefined && item.active_spokes > 0" class="metric-item">
@@ -122,12 +103,12 @@
         <n-table :bordered="false" :single-line="true" size="small" style="min-width: 760px;">
           <thead>
             <tr>
-              <th>Protocol 地址</th>
+              <th style="width: 160px;">Protocol 地址</th>
               <th>NBMA 地址</th>
-              <th>接口</th>
-              <th>类型</th>
-              <th>Flags</th>
-              <th>剩余时间</th>
+              <th style="width: 110px;">接口</th>
+              <th style="width: 130px;">类型</th>
+              <th style="width: 110px;">Flags</th>
+              <th style="width: 110px;">剩余时间</th>
             </tr>
           </thead>
           <tbody>
@@ -153,44 +134,8 @@
       </n-scrollbar>
     </n-card>
 
-    <!-- Arbitration Decisions History -->
-    <n-card title="Witness 历史仲裁事件（非当前状态）" class="mb-4">
-      <n-alert type="info" :show-icon="false" class="mb-2">
-        当前状态以上方 Quorum 状态为准；下表仅记录历史决策与失败原因。
-      </n-alert>
-      <n-scrollbar style="max-height: 260px;" x-scrollable>
-        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 750px;">
-          <thead class="sticky-thead">
-            <tr>
-              <th style="width: 170px;">事件时间</th>
-              <th style="width: 80px;">Term</th>
-              <th style="width: 180px;">相关 Hub</th>
-              <th style="width: 120px;">仲裁决策</th>
-              <th style="min-width: 200px;" class="allow-wrap">判定依据与推理</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!arbitrations || arbitrations.length === 0">
-              <td colspan="5" class="text-center text-muted">目前主备运行平稳，无异常仲裁与脑裂事件</td>
-            </tr>
-            <tr v-for="a in arbitrations" :key="a.id">
-              <td>{{ a.recorded_at ? new Date(a.recorded_at).toLocaleString() : '' }}</td>
-              <td><code>Term {{ a.term }}</code></td>
-              <td>{{ arbitrationNodes(a) }}</td>
-              <td>
-                <n-tag :type="a.decision && a.decision.includes('approve') ? 'success' : a.decision && a.decision.includes('alert') ? 'error' : 'info'" size="small">
-                  {{ a.decision || 'N/A' }}
-                </n-tag>
-              </td>
-              <td class="allow-wrap">{{ a.reason }}</td>
-            </tr>
-          </tbody>
-        </n-table>
-      </n-scrollbar>
-    </n-card>
-
     <!-- Recent Probes History with server-aggregated timeline -->
-    <n-card class="probes-card">
+    <n-card class="probes-card mb-4">
       <template #header>
         <div class="card-header-bar">
           <div class="card-title-group">
@@ -215,6 +160,7 @@
             <n-select
               v-model:value="probeLayer"
               :options="[
+                { label: 'WS Ping/Pong', value: 'agent_telemetry' },
                 { label: 'L3 物理 Ping', value: 'l3_nbma' },
                 { label: 'L4 49002 端口', value: 'l4_port' },
                 { label: '全部探针分线', value: 'all' }
@@ -227,7 +173,7 @@
             <n-radio-group v-model:value="metricType" size="small" class="control-metric-group">
               <n-radio-button value="all">全部</n-radio-button>
               <n-radio-button value="rtt">延迟</n-radio-button>
-              <n-radio-button value="loss">丢包率</n-radio-button>
+              <n-radio-button value="loss">{{ probeLayer === 'agent_telemetry' ? '超时率' : probeLayer === 'l4_port' ? '失败率' : '丢包率' }}</n-radio-button>
             </n-radio-group>
 
             <!-- Time Range Segmented Pills (1H / 6H / 12H / 24H) -->
@@ -243,6 +189,7 @@
 
       <!-- Interactive Line Chart View -->
       <div class="chart-wrapper">
+        <p class="text-muted">{{ probeLayer === 'agent_telemetry' ? 'WS 应用层往返延迟与探测超时率；仅展示已采集的 WS 样本。' : 'L3/L4 展示入站探测结果；无响应不代表 Agent 离线。防火墙隔离节点请查看 WS Ping/Pong。' }}</p>
         <ProbeLineChart
           :probes="probes"
           :time-hours="timeHours"
@@ -253,11 +200,44 @@
         />
       </div>
     </n-card>
+
+    <!-- Arbitration Decisions History -->
+    <n-card title="Witness 历史仲裁事件（非当前状态）">
+      <n-scrollbar style="max-height: 260px;" x-scrollable>
+        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 750px; table-layout: auto;">
+          <thead class="sticky-thead">
+            <tr>
+              <th style="width: 170px;">事件时间</th>
+              <th style="width: 80px;">Term</th>
+              <th style="width: 180px;">相关 Hub</th>
+              <th style="width: 120px;">仲裁决策</th>
+              <th class="allow-wrap">判定依据与推理</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!arbitrations || arbitrations.length === 0">
+              <td colspan="5" class="text-center text-muted">目前主备运行平稳，无异常仲裁与脑裂事件</td>
+            </tr>
+            <tr v-for="a in arbitrations" :key="a.id">
+              <td>{{ a.recorded_at ? new Date(a.recorded_at).toLocaleString() : '' }}</td>
+              <td><code>Term {{ a.term }}</code></td>
+              <td>{{ arbitrationNodes(a) }}</td>
+              <td>
+                <n-tag :type="a.decision && a.decision.includes('approve') ? 'success' : a.decision && a.decision.includes('alert') ? 'error' : 'info'" size="small">
+                  {{ a.decision || 'N/A' }}
+                </n-tag>
+              </td>
+              <td class="allow-wrap">{{ a.reason }}</td>
+            </tr>
+          </tbody>
+        </n-table>
+      </n-scrollbar>
+    </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import {
   NGrid,
   NGridItem,
@@ -270,14 +250,13 @@ import {
   NRadioGroup,
   NRadioButton,
   NSkeleton,
-  NAlert,
   NIcon,
 } from 'naive-ui'
 import { PulseOutline } from '@vicons/ionicons5'
 import { api } from '../api/client'
 import { useAppStore } from '../store'
 import ProbeLineChart from '../components/ProbeLineChart.vue'
-import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, WitnessQuorumStatus, SpokeInfo } from '../types'
+import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, SpokeInfo } from '../types'
 
 const store = useAppStore()
 
@@ -285,13 +264,12 @@ const loading = ref(true)
 const slaList = ref<SLAMatrixItem[]>([])
 const probes = shallowRef<ProbeRecord[]>([])
 const arbitrations = ref<ArbitrationRecord[]>([])
-const quorum = ref<WitnessQuorumStatus | null>(null)
 
 const selectedNode = ref<string>('all')
 const selectedSpokes = ref<SpokeInfo[]>([])
 const selectedSpokesLoading = ref(false)
 const selectedSpokesError = ref('')
-const probeLayer = ref<'l3_nbma' | 'l4_port' | 'all'>('l3_nbma')
+const probeLayer = ref<'l3_nbma' | 'l4_port' | 'agent_telemetry' | 'all'>('agent_telemetry')
 const metricType = ref<'all' | 'rtt' | 'loss'>('all')
 const timeHours = ref<number>(1)
 let probeRequestSequence = 0
@@ -303,25 +281,6 @@ const healthyNodesCount = computed(
 const degradedNodesCount = computed(
   () => (slaList.value || []).filter((s) => s && s.overall_state !== 'healthy').length
 )
-const quorumHealthy = computed(() =>
-  (quorum.value?.policy === 'hub-majority' &&
-    quorum.value.members.some((m) => m.quorum_available)) ||
-  (quorum.value?.policy !== 'hub-majority' && quorum.value?.mode === 'legacy') ||
-  (quorum.value?.mode === 'active' && quorum.value.members.some((m) => m.quorum_available)))
-const quorumAlertType = computed(() => quorum.value?.policy !== 'hub-majority' && quorum.value?.mode === 'legacy'
-  ? 'info'
-  : quorumHealthy.value ? 'success' : quorum.value?.mode === 'active' ? 'error' : 'warning')
-const quorumTitle = computed(() => {
-	if (quorum.value?.policy === 'hub-majority') {
-		return quorumHealthy.value
-			? `Hub Majority ${quorum.value.votes}/${quorum.value.voters} 正常`
-			: `Hub Majority ${quorum.value.votes}/${quorum.value.required} 不足`
-	}
-  if (!quorum.value || quorum.value.mode === 'legacy') return 'Legacy availability-first'
-  if (quorum.value.mode === 'preparing') return 'Witness preparing'
-  if (quorum.value.mode === 'disabling') return 'Witness disabling'
-  return quorumHealthy.value ? 'Witness Quorum 2/3 正常' : 'Witness 无多数派'
-})
 
 const getNodeDisplayName = (nodeId: string) => {
   const n = store.nodes.find((item) => item.id === nodeId)
@@ -418,17 +377,11 @@ const loadData = async () => {
   }
 }
 
-const loadQuorum = async () => {
-  quorum.value = await api.getWitnessQuorum().catch(() => null)
-}
-
 watch([selectedNode, probeLayer, timeHours], loadProbes)
 watch(selectedNode, loadSelectedSpokes)
 
 onMounted(() => {
   loadData()
-  loadQuorum()
-  quorumTimer = window.setInterval(loadQuorum, 1000)
   loadProbes()
   loadSelectedSpokes()
   if (store.nodes.length === 0) {
@@ -436,10 +389,6 @@ onMounted(() => {
   }
 })
 
-let quorumTimer: number | null = null
-onUnmounted(() => {
-  if (quorumTimer !== null) window.clearInterval(quorumTimer)
-})
 </script>
 
 <style scoped>
@@ -463,22 +412,6 @@ onUnmounted(() => {
 .sub-title {
   font-size: 13px;
   color: var(--text-muted);
-}
-
-.quorum-summary,
-.quorum-members {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.quorum-summary {
-  justify-content: space-between;
-}
-
-.quorum-members {
-  margin-top: 10px;
 }
 
 .sla-card {

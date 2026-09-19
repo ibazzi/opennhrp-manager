@@ -23,6 +23,8 @@ type AgentTelemetry struct {
 	AgentConnected   bool
 	NodeType         string
 	WSRttMs          float64
+	WSLossRate       float64
+	WSLossSamples    int
 	ClusterID        string
 	MemberID         string
 	MemberState      string
@@ -372,21 +374,15 @@ func (m *NodeManager) DisconnectAgent(nodeID string) {
 	}
 }
 
-func (m *NodeManager) UpdateHeartbeat(nodeID string, hb protocol.HeartbeatPayload) {
-	var rttMs float64
-	if !hb.Timestamp.IsZero() {
-		dur := time.Since(hb.Timestamp)
-		if dur > 0 && dur < 10*time.Second {
-			rttMs = float64(dur.Microseconds()) / 1000.0
-		}
-	}
-
+func (m *NodeManager) UpdateHeartbeat(nodeID string, hb protocol.HeartbeatPayload, rttMs, lossRate float64, lossSamples int) {
 	m.mu.Lock()
 	m.telemetry[nodeID] = AgentTelemetry{
 		LastHeartbeat:    time.Now(),
 		AgentConnected:   true,
 		NodeType:         hb.NodeType,
 		WSRttMs:          rttMs,
+		WSLossRate:       lossRate,
+		WSLossSamples:    lossSamples,
 		ClusterID:        hb.ClusterID,
 		MemberID:         hb.MemberID,
 		MemberState:      hb.MemberState,
@@ -631,9 +627,7 @@ func (m *NodeManager) ListNodes(_ context.Context) ([]db.NodeRecord, error) {
 				n.NetworkHealth = tel.NetworkHealth
 				n.ServiceAvail = tel.ServiceAvail
 				n.ActiveSpokes = tel.ActiveSpokes
-				if tel.WSRttMs > 0 {
-					n.WSRttMs = tel.WSRttMs
-				}
+				n.WSRttMs = tel.WSRttMs
 			}
 		}
 		nodes = append(nodes, n)

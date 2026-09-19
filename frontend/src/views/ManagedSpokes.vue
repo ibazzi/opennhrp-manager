@@ -12,8 +12,8 @@
 
     <n-card class="mb-4">
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" style="min-width: 850px">
-          <thead><tr><th>名称 / ID</th><th>Protocol IP</th><th>Agent</th><th>OpenNHRP</th><th>Hub peers</th><th>RTT</th><th>最后心跳</th><th>操作</th></tr></thead>
+        <n-table :bordered="false" style="min-width: 1170px">
+          <thead><tr><th>名称 / ID</th><th style="width: 160px;">Protocol IP</th><th style="width: 90px;">Agent</th><th style="width: 110px;">OpenNHRP</th><th style="width: 100px;">Hub peers</th><th style="width: 100px;">RTT</th><th style="width: 190px;">最后心跳</th><th style="width: 220px;">操作</th></tr></thead>
           <tbody>
             <tr v-if="spokes.length === 0"><td colspan="8" class="empty">暂无已登记的 Spoke</td></tr>
             <tr v-for="spoke in spokes" :key="spoke.id" :class="{ selected: selectedId === spoke.id }" @click="selectSpoke(spoke.id)">
@@ -47,8 +47,8 @@
       <n-grid :cols="2" :x-gap="16" :y-gap="16" responsive="screen" item-responsive class="mb-4">
         <n-grid-item span="2 m:1">
           <n-card title="OpenNHRP 接口" class="peer-summary-card">
-            <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 520px">
-              <thead><tr><th>名称</th><th>Protocol IP</th><th>NBMA</th><th>MTU</th></tr></thead>
+            <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 600px">
+              <thead><tr><th>名称</th><th style="width: 150px;">Protocol IP</th><th style="width: 160px;">NBMA</th><th style="width: 80px;">MTU</th></tr></thead>
               <tbody>
                 <tr v-if="interfaces.length === 0"><td colspan="4" class="empty">暂无接口数据</td></tr>
                 <tr v-for="item in interfaces" :key="item.name"><td><code>{{ item.name }}</code></td><td>{{ item.protocol_address || '-' }}</td><td>{{ item.nbma_address || '-' }}</td><td>{{ item.mtu || '-' }}</td></tr>
@@ -58,8 +58,8 @@
         </n-grid-item>
         <n-grid-item span="2 m:1">
           <n-card title="当前 Hub / NHRP peers" class="peer-summary-card">
-            <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 520px">
-              <thead><tr><th>Protocol IP</th><th>NBMA</th><th>接口</th><th>类型</th><th>租约</th></tr></thead>
+            <n-scrollbar x-scrollable><n-table size="small" :bordered="false" style="min-width: 600px">
+              <thead><tr><th style="width: 150px;">Protocol IP</th><th>NBMA</th><th style="width: 100px;">接口</th><th style="width: 100px;">类型</th><th style="width: 100px;">租约</th></tr></thead>
               <tbody>
                 <tr v-if="peers.length === 0"><td colspan="5" class="empty">暂无 peer 数据</td></tr>
                 <tr v-for="peer in peers" :key="`${peer.interface}-${peer.protocol_address}`"><td>{{ peer.protocol_address }}</td><td>{{ peer.nbma_address || '-' }}</td><td>{{ peer.interface }}</td><td>{{ peer.type }}</td><td>{{ peer.expires_in_sec }}s<span v-if="peer.stale">（缓存）</span></td></tr>

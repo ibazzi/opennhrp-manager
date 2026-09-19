@@ -74,7 +74,7 @@
     <!-- Spokes Data Table -->
     <n-card>
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" style="min-width: 900px;">
+        <n-table :bordered="false" :single-line="true" style="min-width: 1500px;">
         <thead>
           <tr>
             <th style="width: 140px;">Protocol IP (GRE)</th>
@@ -85,7 +85,7 @@
             <th style="width: 90px;">接入模式</th>
             <th style="width: 110px;">标志位 (Flags)</th>
             <th style="width: 90px;">租约剩余</th>
-            <th style="min-width: 120px;">别名 / 备注</th>
+            <th>别名 / 备注</th>
             <th style="width: 340px;">纳管 / 操作</th>
           </tr>
         </thead>

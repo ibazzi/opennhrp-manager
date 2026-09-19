@@ -17,6 +17,7 @@ func TestGetProbesAggregatesAndFilters(t *testing.T) {
 	recordedAt := now.Add(-5 * time.Minute)
 	for _, probe := range []WitnessProbeRecord{
 		{TargetNodeID: "hub-a", ProbeType: "l3_nbma", TargetIP: "192.0.2.1", RttMs: 10, Success: true, RecordedAt: recordedAt},
+		{TargetNodeID: "hub-a", ProbeType: "l3_nbma", RttMs: 999, Success: true, Detail: "ICMP blocked by firewall, Agent WS RTT", RecordedAt: recordedAt},
 		{TargetNodeID: "hub-a", ProbeType: "l3_nbma", TargetIP: "192.0.2.1", RttMs: 30, LossRate: 0.25, Success: true, RecordedAt: recordedAt},
 		{TargetNodeID: "hub-a", ProbeType: "l3_nbma", TargetIP: "192.0.2.1", LossRate: 1, Success: false, RecordedAt: recordedAt},
 		{TargetNodeID: "hub-a", ProbeType: "l4_port", TargetIP: "192.0.2.1:49002", RttMs: 5, Success: true, RecordedAt: recordedAt},

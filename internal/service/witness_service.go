@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,6 +61,7 @@ type NodeSLASummary struct {
 	NodeID            string  `json:"node_id"`
 	AvgRttMs          float64 `json:"avg_rtt_ms"`
 	LossRate          float64 `json:"loss_rate"`
+	LossSamples       int     `json:"loss_samples"`
 	L3Healthy         bool    `json:"l3_healthy"`
 	L4Healthy         bool    `json:"l4_healthy"`
 	AgentHealthy      bool    `json:"agent_healthy"`
@@ -157,20 +159,18 @@ func (w *WitnessService) runProbeCycle(ctx context.Context) {
 		telemetry, hasTel := w.nodeMgr.GetNodeTelemetry(n.ID)
 		agentHealthy := w.nodeMgr.IsAgentHealthy(n.ID)
 
-		if n.ProbeMode == "agent_only" {
-			wsRtt := 0.0
-			if hasTel {
-				wsRtt = telemetry.WSRttMs
-			}
+		if hasTel && agentHealthy && telemetry.WSLossSamples > 0 {
 			_ = w.saveProbe(db.WitnessProbeRecord{
 				TargetNodeID: n.ID,
 				ProbeType:    "agent_telemetry",
 				TargetIP:     n.Host,
-				RttMs:        wsRtt,
-				LossRate:     0.0,
+				RttMs:        telemetry.WSRttMs,
+				LossRate:     telemetry.WSLossRate,
 				Success:      agentHealthy,
-				Detail:       fmt.Sprintf("Agent Telemetry: network_health=%v, service_avail=%v", n.NetworkHealth, n.ServiceAvail),
+				Detail:       fmt.Sprintf("WS Ping/Pong: samples=%d, timeout=5s", telemetry.WSLossSamples),
 			})
+		}
+		if n.ProbeMode == "agent_only" {
 			continue
 		}
 
@@ -187,29 +187,13 @@ func (w *WitnessService) runProbeCycle(ctx context.Context) {
 			conn.Close()
 		}
 
-		// When agent is healthy but L4 fails: firewall is blocking inbound, mark as success with WS RTT
-		var lossL4 float64
+		lossL4 := 0.0
 		if !l4Ok {
-			if agentHealthy {
-				// Firewall protected: use WS RTT, no loss
-				wsRtt := 0.0
-				if hasTel {
-					wsRtt = telemetry.WSRttMs
-				}
-				l4Ok = true
-				rttL4 = wsRtt
-				lossL4 = 0.0
-			} else {
-				lossL4 = 1.0
-				rttL4 = 0.0
-			}
+			lossL4 = 1
 		}
-
 		detailL4 := fmt.Sprintf("TCP 49002 probe: %v", err)
 		if !l4Ok && agentHealthy {
-			detailL4 = "TCP 49002 inbound blocked by firewall (Agent telemetry healthy)"
-		} else if l4Ok && err != nil && agentHealthy {
-			detailL4 = fmt.Sprintf("TCP 49002 blocked by firewall, Agent WS RTT %.1fms", rttL4)
+			detailL4 = "TCP 49002 blocked by firewall (Agent telemetry healthy)"
 		}
 
 		_ = w.saveProbe(db.WitnessProbeRecord{
@@ -224,20 +208,9 @@ func (w *WitnessService) runProbeCycle(ctx context.Context) {
 
 		// 2. L3 ICMP / System Ping Probe
 		rttL3, loss, l3Ok := w.pingTarget(host)
-		// When agent is healthy but L3 ping fails: firewall blocks ICMP, mark as success with WS RTT
-		if !l3Ok && agentHealthy {
-			wsRtt := 0.0
-			if hasTel {
-				wsRtt = telemetry.WSRttMs
-			}
-			l3Ok = true
-			rttL3 = wsRtt
-			loss = 0.0
-		}
-
 		detailL3 := fmt.Sprintf("ICMP ping: loss %.1f%%", loss*100)
-		if l3Ok && rttL3 > 0 && loss == 0 && agentHealthy && rttL3 == telemetry.WSRttMs {
-			detailL3 = fmt.Sprintf("ICMP blocked by firewall, Agent WS RTT %.1fms", rttL3)
+		if !l3Ok && agentHealthy {
+			detailL3 = "ICMP blocked by firewall (Agent telemetry healthy)"
 		}
 
 		_ = w.saveProbe(db.WitnessProbeRecord{
@@ -323,21 +296,25 @@ func (w *WitnessService) probeHost(ctx context.Context, node db.NodeRecord) stri
 }
 
 func (w *WitnessService) pingTarget(host string) (rttMs float64, lossRate float64, success bool) {
-	out, err := exec.Command("ping", "-c", "2", "-W", "1", host).CombinedOutput()
-	if err != nil {
-		return 0, 1.0, false
+	cmd := exec.Command("ping", "-c", "2", "-W", "1", host)
+	cmd.Env = append(cmd.Environ(), "LC_ALL=C")
+	out, _ := cmd.CombinedOutput()
+	return parsePingOutput(string(out))
+}
+
+var pingLossPattern = regexp.MustCompile(`(?:^|[,\s])([0-9]+(?:\.[0-9]+)?)% packet loss`)
+
+func parsePingOutput(output string) (rttMs float64, lossRate float64, success bool) {
+	match := pingLossPattern.FindStringSubmatch(output)
+	if match == nil {
+		return 0, 1, false
 	}
-	output := string(out)
-	// Parse loss and avg rtt
-	if strings.Contains(output, "0% packet loss") {
-		lossRate = 0.0
-		success = true
-	} else if strings.Contains(output, "100% packet loss") {
-		return 0, 1.0, false
-	} else {
-		lossRate = 0.5
-		success = true
+	percent, err := strconv.ParseFloat(match[1], 64)
+	if err != nil || percent < 0 || percent > 100 {
+		return 0, 1, false
 	}
+	lossRate = percent / 100
+	success = lossRate < 1
 
 	// Find avg rtt e.g. "min/avg/max/mdev = 0.040/0.055/0.070/0.015 ms"
 	if idx := strings.Index(output, "min/avg/max"); idx != -1 {
@@ -1123,28 +1100,36 @@ func SummarizeNodeSLA(nodeID string, probes []db.WitnessProbeRecord, node db.Nod
 
 	var l3TotalRtt float64
 	var l3SuccessCount int
-	var l3LossCount int
+	var l3LossTotal float64
 	var l3TotalProbes int
 	var haveL3, haveL4 bool
 
 	for _, probe := range probes {
 		switch probe.ProbeType {
 		case "l3_nbma":
-			l3TotalProbes++
-			if !probe.Success || probe.LossRate >= 1.0 {
-				l3LossCount++
-			} else {
-				l3TotalRtt += probe.RttMs
-				l3SuccessCount++
-			}
 			if !haveL3 {
 				summary.L3Healthy, haveL3 = probe.Success, true
+			}
+			// Older records replaced failed ICMP with successful WS samples.
+			if probe.Success && strings.Contains(strings.ToLower(probe.Detail), "firewall") {
+				continue
+			}
+			l3TotalProbes++
+			if !probe.Success || probe.LossRate >= 1.0 {
+				l3LossTotal += 1
+			} else {
+				l3LossTotal += probe.LossRate
+				l3TotalRtt += probe.RttMs
+				l3SuccessCount++
 			}
 		case "l4_port":
 			if !haveL4 {
 				summary.L4Healthy, haveL4 = probe.Success, true
 			}
 		case "agent_telemetry":
+			if node.ProbeMode != "agent_only" {
+				continue
+			}
 			if !haveL3 {
 				summary.L3Healthy, haveL3 = probe.Success, true
 			}
@@ -1158,30 +1143,43 @@ func SummarizeNodeSLA(nodeID string, probes []db.WitnessProbeRecord, node db.Nod
 		summary.AvgRttMs = l3TotalRtt / float64(l3SuccessCount)
 	}
 	if l3TotalProbes > 0 {
-		summary.LossRate = float64(l3LossCount) / float64(l3TotalProbes)
+		summary.LossRate = l3LossTotal / float64(l3TotalProbes)
+		summary.LossSamples = l3TotalProbes
 	}
 
-	// Detect firewall protection: probe succeeds (agent took over) but detail mentions "firewall"
-	// OR: direct probe fails but agent is healthy (legacy path)
+	// Only the latest result of each probe type describes current protection.
 	var firewallDetected bool
+	seen := make(map[string]bool)
 	for _, probe := range probes {
+		if seen[probe.ProbeType] {
+			continue
+		}
+		seen[probe.ProbeType] = true
 		if strings.Contains(strings.ToLower(probe.Detail), "firewall") {
 			firewallDetected = true
-			break
 		}
 	}
-	if firewallDetected || ((!summary.L3Healthy || !summary.L4Healthy) && agentHealthy) {
+
+	if node.ProbeMode == "agent_only" || firewallDetected || ((!summary.L3Healthy || !summary.L4Healthy) && agentHealthy) {
 		summary.FirewallProtected = true
-		summary.AgentHealthy = true // Agent was healthy when firewall protection was recorded
+		summary.AgentHealthy = agentHealthy
 		summary.LatencySource = "ws"
-		if hasTel && tel.WSRttMs > 0 {
+		if hasTel {
 			summary.AvgRttMs = tel.WSRttMs
 		} else if node.WSRttMs > 0 {
 			summary.AvgRttMs = node.WSRttMs
 		}
-		summary.LossRate = 0.0
+		summary.LossRate = tel.WSLossRate
+		summary.LossSamples = 0
+		if hasTel && agentHealthy {
+			summary.LossSamples = tel.WSLossSamples
+		}
 		summary.DataHealthy = true
 		summary.OverallState = "healthy"
+		if !agentHealthy {
+			summary.DataHealthy = false
+			summary.OverallState = "critical"
+		}
 	} else if summary.L3Healthy && summary.L4Healthy {
 		summary.DataHealthy = true
 		summary.OverallState = "healthy"

@@ -40,7 +40,7 @@
         <n-table :bordered="false" :single-line="true" style="min-width: 640px;">
           <thead>
             <tr>
-              <th style="width: 140px;">接口名称 (Name)</th>
+              <th>接口名称 (Name)</th>
               <th style="width: 100px;">类型</th>
               <th style="width: 150px;">Protocol IP</th>
               <th style="width: 160px;">NBMA 外网物理地址</th>
@@ -86,14 +86,14 @@
     <!-- Audit Logs -->
     <n-card title="配置操作与审计历史 (Audit Logs)">
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 820px;">
+        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 850px;">
           <thead>
             <tr>
               <th style="width: 170px;">操作时间</th>
               <th style="width: 160px;">节点 ID</th>
               <th style="width: 130px;">操作类型</th>
               <th style="width: 100px;">执行人</th>
-              <th style="min-width: 180px;" class="allow-wrap">备注 / 详情</th>
+              <th class="allow-wrap">备注 / 详情</th>
               <th style="width: 90px;">结果</th>
             </tr>
           </thead>

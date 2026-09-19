@@ -139,9 +139,6 @@ export const api = {
   setSpokeMetadata: (data: { protocol_address: string; alias?: string; site_name?: string; contact?: string; notes?: string }) =>
     http.post('/spokes/metadata', data).then((r) => r.data),
 
-  generateSpokeConfig: (data: any) =>
-    http.post<{ opennhrp_conf: string; setup_script: string }>('/spokes/provision/generate', data).then((r) => r.data),
-
   // Managed Spoke devices
   listManagedSpokes: () =>
     http.get<ManagedSpoke[]>('/managed-spokes').then((r) => r.data),

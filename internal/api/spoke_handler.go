@@ -17,16 +17,14 @@ import (
 )
 
 type SpokeHandler struct {
-	nodeMgr     *service.NodeManager
-	database    *db.DB
-	provService *service.ProvisioningService
+	nodeMgr  *service.NodeManager
+	database *db.DB
 }
 
-func NewSpokeHandler(nodeMgr *service.NodeManager, database *db.DB, provService *service.ProvisioningService) *SpokeHandler {
+func NewSpokeHandler(nodeMgr *service.NodeManager, database *db.DB) *SpokeHandler {
 	return &SpokeHandler{
-		nodeMgr:     nodeMgr,
-		database:    database,
-		provService: provService,
+		nodeMgr:  nodeMgr,
+		database: database,
 	}
 }
 
@@ -234,46 +232,6 @@ func (h *SpokeHandler) PurgeRedirect(c *gin.Context) {
 
 	h.database.AddAuditLog(nodeID, "admin", "purge_redirect", protoIP, true, "")
 	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-func (h *SpokeHandler) GenerateSpokeConfig(c *gin.Context) {
-	var req service.SpokeConfigTemplateParams
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	conf := h.provService.GenerateOpenNHRPConf(req)
-	script := h.provService.GenerateSetupScript(req)
-
-	c.JSON(http.StatusOK, gin.H{
-		"opennhrp_conf": conf,
-		"setup_script":  script,
-	})
-}
-
-func (h *SpokeHandler) DownloadSpokePackage(c *gin.Context) {
-	var req service.SpokeConfigTemplateParams
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	nodeID := c.Query("node_id")
-	exec, _ := h.nodeMgr.GetHubExecutor(nodeID)
-	var keyBytes []byte
-	if exec != nil {
-		keyBytes, _ = exec.ExportSpokeKey(c.Request.Context())
-	}
-
-	zipData, err := h.provService.BuildPackageZip(req, keyBytes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.Header("Content-Disposition", "attachment; filename=opennhrp-spoke-package.zip")
-	c.Data(http.StatusOK, "application/zip", zipData)
 }
 
 func (h *SpokeHandler) SetSpokeMetadata(c *gin.Context) {

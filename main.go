@@ -52,13 +52,12 @@ func main() {
 	logHub := service.NewLogHub()
 	nodeMgr := service.NewNodeManager(cfg, database, logHub)
 	witnessSvc := service.NewWitnessService(cfg, database, nodeMgr)
-	provService := service.NewProvisioningService(nodeMgr)
 
 	// Start Background Engines
 	go nodeMgr.Start(ctx)
 	go witnessSvc.Start(ctx)
 
-	router := api.SetupRouter(cfg, database, nodeMgr, witnessSvc, provService, logHub)
+	router := api.SetupRouter(cfg, database, nodeMgr, witnessSvc, logHub)
 	api.ServeSPA(router, webAssets)
 
 	bindAddr := net.JoinHostPort(cfg.BindHost, cfg.ServerPort)

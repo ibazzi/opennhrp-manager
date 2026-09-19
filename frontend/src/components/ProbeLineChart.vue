@@ -18,7 +18,7 @@ const props = withDefaults(
     probes?: ProbeRecord[]
     timeHours?: number
     selectedNode?: string
-    probeLayer?: 'l3_nbma' | 'l4_port' | 'all'
+    probeLayer?: 'l3_nbma' | 'l4_port' | 'agent_telemetry' | 'all'
     metricType?: 'all' | 'rtt' | 'loss'
     nodes?: NodeRecord[]
   }>(),
@@ -178,11 +178,11 @@ const renderChart = () => {
 
     if (showLoss) {
       series.push({
-        name: `${displayName} · 丢包率`,
+        name: `${displayName} · ${group.probeType === 'agent_telemetry' ? '探测超时率' : group.probeType === 'l4_port' ? '连接失败率' : '丢包率'}`,
         type: 'line',
-        smooth: 0.38,
+        smooth: false,
         sampling: 'lttb',
-        connectNulls: true,
+        connectNulls: false,
         showSymbol: false,
         symbol: 'circle',
         symbolSize: 6,
@@ -241,7 +241,7 @@ const renderChart = () => {
   if (showLoss) {
     yAxes.push({
       type: 'value',
-      name: '丢包率 (%)',
+      name: activeLayer === 'l3_nbma' ? '丢包率 (%)' : activeLayer === 'l4_port' ? '连接失败率 (%)' : activeLayer === 'agent_telemetry' ? '探测超时率 (%)' : '丢包 / 超时 / 失败 (%)',
       position: showRTT ? 'right' : 'left',
       nameLocation: 'end',
       nameGap: isMobile ? 8 : 10,
@@ -307,7 +307,7 @@ const renderChart = () => {
         params.forEach((item: any) => {
           if (item && item.value && Array.isArray(item.value) && item.value.length >= 2) {
             const val = item.value[1]
-            const isLoss = item.seriesName && item.seriesName.includes('丢包率')
+            const isLoss = item.seriesName && item.seriesName.endsWith('率')
             if (val !== null && val !== undefined && !isNaN(val)) {
               const unit = isLoss ? '%' : ' ms'
               const numVal = Number(val)
@@ -318,7 +318,7 @@ const renderChart = () => {
             } else if (!isLoss) {
               html += `<div style="display:flex;justify-content:space-between;gap:16px;margin:3px 0;font-size:${isMobile ? 11 : 12}px;">
                 <span>${item.marker || ''} ${item.seriesName || ''}</span>
-                <strong style="color:#ef4444;font-family:monospace;">服务断开 (无响应)</strong>
+                <strong style="color:#ef4444;font-family:monospace;">探测无响应 / 无有效延迟</strong>
               </div>`
             }
           }
