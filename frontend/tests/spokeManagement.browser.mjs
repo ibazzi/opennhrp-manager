@@ -32,9 +32,12 @@ ws.addEventListener('message', async event => {
     else if (path === '/api/nodes') body = [{ id: 'hub', name: 'hub', type: 'hub', status: 'online', role: 'leader', service_avail: true }]
     else if (path === '/api/spokes') body = [spoke]
     else if (path === '/api/managed-spokes') { body = devices; managedRequests++ }
-    else if (path === '/api/interfaces') body = [{ name: 'tun0', protocol_address: '10.164.0.252/24' }]
+    else if (path === '/api/config/interfaces') body = [{ name: 'tun0', protocol_address: '10.164.0.252/24' }]
     else if (path === '/api/config/file') body = { content: 'interface tun0' }
-    else if (path.endsWith('/ha')) body = { candidates: [], active_member: 'hub', selection_mode: 'auto' }
+    else if (path.endsWith('/ha')) body = { candidates: [
+      { member: 'hub', state: 'ready', ready: true, active: true, authenticated: true, selected_address: '192.0.2.1', term: 1, leader: 'hub', srtt_ms: 12.5, quality_rtt_ms: 20.1, loss_pct: 1.67, quality_samples: 60, quality_failures: 1, last_quality_reply_age_ms: 150, quality_valid: true, loss_score: 56.666667, latency_score: 27.245455, priority_score: 10, score: 94 },
+      { member: 'unknown', state: 'probing', ready: false, srtt_ms: 0, quality_rtt_ms: null, loss_pct: 100, quality_samples: 0, quality_failures: 0, last_quality_reply_age_ms: null, quality_valid: false, loss_score: 0, latency_score: 0, priority_score: 10, score: 0 },
+    ], active_member: 'hub', selection_mode: 'auto' }
     await send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(body)).toString('base64') })
   }
 })
@@ -81,6 +84,14 @@ try {
     await until(`location.search.includes('node=ctyun') && !!document.querySelector('.terminal-container')`)
     assert.equal(await evaluate(`document.querySelector('tbody tr.selected')?.textContent.includes('天翼云')`), true)
     assert.equal(await evaluate(`document.body.textContent.includes('离线设备')`), true)
+    await until(`document.body.textContent.includes('评分 RTT') && document.body.textContent.includes('20.1 ms')`)
+    assert.equal(await evaluate(`document.body.textContent.includes('超时估计 SRTT：12.5 ms')`), true)
+    assert.equal(await evaluate(`document.body.textContent.includes('1 / 60 次失败')`), true)
+    assert.equal(await evaluate(`document.body.textContent.includes('56.67 / 27.25 / 10.00')`), true)
+    const unknown = await evaluate(`[...document.querySelectorAll('tr')].find(e => e.textContent.includes('unknown')).textContent`)
+    assert.ok(unknown.includes('测量不足或已过期'))
+    assert.ok(!unknown.includes('100.0%'), 'unknown quality must not be displayed as measured failure')
+    assert.ok(unknown.includes('—'))
     await tab('接入记录')
     await until(`!document.querySelector('.terminal-container') && !location.search.includes('tab=managed')`)
     const requests = managedRequests

@@ -103,3 +103,33 @@ func TestCurrentOpenNHRPOutputs(t *testing.T) {
 		t.Fatal("expected HA status error")
 	}
 }
+
+func TestHAQualityRoundTrip(t *testing.T) {
+	for _, raw := range []string{
+		`{"quality_rtt_ms":20.125,"quality_samples":60,"quality_failures":1,"last_quality_reply_age_ms":150.5,"quality_valid":true,"loss_score":56.666667,"latency_score":27.238636,"priority_score":10,"score":94}`,
+		`{"quality_rtt_ms":null,"quality_samples":0,"quality_failures":0,"last_quality_reply_age_ms":null,"quality_valid":false,"loss_score":0,"latency_score":0,"priority_score":10,"score":0}`,
+		`{"quality_rtt_ms":20.125,"quality_samples":60,"quality_failures":1,"last_quality_reply_age_ms":150.5,"quality_valid":true,"loss_score":56.666667,"latency_score":27.238636,"priority_score":10,"score":0}`,
+	} {
+		status, err := ParseHAStatusFromJSON("Status: ok\n\n" + `{"interface":"gre-ha","candidates":[` + raw + `]}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := json.Marshal(status.Candidates[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want, got map[string]any
+		if err := json.Unmarshal([]byte(raw), &want); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(encoded, &got); err != nil {
+			t.Fatal(err)
+		}
+		for key, value := range want {
+			actual, exists := got[key]
+			if !exists || actual != value {
+				t.Errorf("%s: got %v (present %v), want %v", key, actual, exists, value)
+			}
+		}
+	}
+}

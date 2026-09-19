@@ -88,9 +88,10 @@
             清除手动目标并恢复现有自动评分切换策略？
           </n-popconfirm>
         </div>
+        <p>失败率统计最近 30 秒内已完成的探测，包含超时和无效回复。评分 RTT 独立平滑；SRTT 用于超时估计。分项上限为 60 / 30 / 10 分，可用性或认证限制可将总分置零，分项不代表迁移资格。</p>
         <n-scrollbar x-scrollable>
-          <n-table size="small" :bordered="false" style="min-width: 880px">
-            <thead><tr><th>Hub</th><th>状态</th><th>Selected endpoint</th><th>RTT</th><th>Loss</th><th>Score</th><th>Term / Leader</th><th>操作</th></tr></thead>
+          <n-table size="small" :bordered="false" style="min-width: 1280px">
+            <thead><tr><th style="width: 180px;">Hub</th><th style="width: 120px;">状态</th><th style="width: 180px;">Selected endpoint</th><th style="width: 170px;">评分 RTT</th><th style="width: 140px;">探测失败率</th><th style="width: 200px;">有效总分</th><th>Term / Leader</th><th style="width: 140px;">操作</th></tr></thead>
             <tbody>
               <tr v-if="haStatus.candidates.length === 0"><td colspan="8" class="empty">暂无 Hub 候选</td></tr>
               <tr v-for="candidate in haStatus.candidates" :key="candidate.member">
@@ -104,11 +105,20 @@
                   </n-tag>
                 </td>
                 <td><code>{{ candidate.selected_address || '-' }}</code></td>
-                <td>{{ candidate.srtt_ms.toFixed(1) }} ms</td>
-                <td>{{ candidate.loss_pct.toFixed(1) }}%</td>
+                <td>
+                  <div>{{ candidate.quality_rtt_ms == null ? '—' : candidate.quality_rtt_ms.toFixed(1) + ' ms' }}</div>
+                  <small>超时估计 SRTT：{{ candidate.srtt_ms.toFixed(1) }} ms</small><br>
+                  <small>有效回复距今：{{ candidate.last_quality_reply_age_ms == null ? '—' : (candidate.last_quality_reply_age_ms / 1000).toFixed(1) + ' s' }}</small>
+                </td>
+                <td>
+                  <div>{{ candidate.quality_samples > 0 ? candidate.loss_pct.toFixed(1) + '%' : '—' }}</div>
+                  <small>30 秒：{{ candidate.quality_failures ?? 0 }} / {{ candidate.quality_samples ?? 0 }} 次失败</small>
+                </td>
                 <td>
                   <n-tag size="small" :type="candidate.active ? 'success' : 'info'">{{ candidate.score }}
                   </n-tag>
+                  <n-tag v-if="!candidate.quality_valid" size="small" type="warning" class="ml-1">测量不足或已过期</n-tag>
+                  <div><small>失败率 / 延时 / 优先级：{{ candidate.loss_score?.toFixed(2) ?? '—' }} / {{ candidate.latency_score?.toFixed(2) ?? '—' }} / {{ candidate.priority_score?.toFixed(2) ?? '—' }}</small></div>
                 </td>
                 <td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td>
                 <td>
