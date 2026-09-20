@@ -1,8 +1,22 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from '../api/client'
 import { isHubNode, isNodeSelectable, selectActiveNode } from '../utils/topologyStatus'
-import type { NodeRecord, UserInfo } from '../types'
+import type { NodeRecord, TopologySnapshot, UserInfo } from '../types'
+
+interface LiveLog {
+  node_id?: string
+  source?: string
+  level: string
+  message: string
+  timestamp: string
+}
+
+interface LiveMessage {
+  type: 'topology' | 'log'
+  topology?: TopologySnapshot
+  log?: LiveLog
+}
 
 export const useAppStore = defineStore('app', () => {
   const savedTheme = localStorage.getItem('opennhrp_theme')
@@ -11,6 +25,12 @@ export const useAppStore = defineStore('app', () => {
   const lastLeaderNodeId = ref<string>('')
   const nodes = ref<NodeRecord[]>([])
   const loading = ref<boolean>(false)
+  const topologySnapshot = ref<TopologySnapshot | null>(null)
+  const liveLog = ref<LiveLog | null>(null)
+  let liveSocket: WebSocket | null = null
+  let liveNodeId = ''
+  let liveIncludeHA = false
+  let reconnectTimer: number | null = null
 
   // Auth State
   const token = ref<string>(localStorage.getItem('opennhrp_token') || '')
@@ -50,6 +70,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const clearAuth = () => {
+    disconnectLiveUpdates()
     token.value = ''
     currentUser.value = null
     localStorage.removeItem('opennhrp_token')
@@ -86,22 +107,74 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  const applyNodes = (list: NodeRecord[]) => {
+    nodes.value = list
+
+    const hubNodes = list.filter(isHubNode)
+    const validNodes = hubNodes.length > 0 ? hubNodes : list
+    const selection = selectActiveNode(validNodes, activeNodeId.value, lastLeaderNodeId.value)
+    activeNodeId.value = selection.activeNodeId
+    lastLeaderNodeId.value = selection.leaderNodeId
+  }
+
   const fetchNodes = async () => {
     if (!token.value) return
     try {
       const list = await api.listNodes()
-      nodes.value = list
-
-      const hubNodes = list.filter(isHubNode)
-      const validNodes = hubNodes.length > 0 ? hubNodes : list
-
-      const selection = selectActiveNode(validNodes, activeNodeId.value, lastLeaderNodeId.value)
-      activeNodeId.value = selection.activeNodeId
-      lastLeaderNodeId.value = selection.leaderNodeId
+      applyNodes(list)
     } catch (e) {
       console.error('Failed to fetch nodes', e)
     }
   }
+
+  const disconnectLiveUpdates = () => {
+    if (reconnectTimer) window.clearTimeout(reconnectTimer)
+    reconnectTimer = null
+    liveNodeId = ''
+    if (liveSocket) {
+      liveSocket.onclose = null
+      liveSocket.close()
+      liveSocket = null
+    }
+  }
+
+  const connectLiveUpdates = (includeHA = liveIncludeHA) => {
+    if (!token.value || typeof window === 'undefined') return
+    const nodeId = activeNodeId.value
+    if (liveSocket && liveNodeId === nodeId && liveIncludeHA === includeHA && liveSocket.readyState < WebSocket.CLOSING) return
+    liveIncludeHA = includeHA
+    disconnectLiveUpdates()
+    liveNodeId = nodeId
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const socket = new WebSocket(
+      `${protocol}//${window.location.host}/api/topology/ws?node_id=${encodeURIComponent(nodeId)}&token=${encodeURIComponent(token.value)}&include_ha=${includeHA ? '1' : '0'}`
+    )
+    liveSocket = socket
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data) as LiveMessage
+        if (message.type === 'log' && message.log) {
+          liveLog.value = message.log
+          return
+        }
+        const snapshot = message.topology
+        if (!snapshot || (snapshot.node_id && snapshot.node_id !== activeNodeId.value)) return
+        topologySnapshot.value = snapshot
+        applyNodes(snapshot.nodes || [])
+      } catch (error) {
+        console.error('Parse live update error', error)
+      }
+    }
+    socket.onclose = () => {
+      if (liveSocket !== socket) return
+      liveSocket = null
+      if (token.value) reconnectTimer = window.setTimeout(connectLiveUpdates, 3000)
+    }
+  }
+
+  watch(activeNodeId, () => {
+    if (liveSocket) connectLiveUpdates(liveIncludeHA)
+  })
 
   const nodeOptions = computed(() => {
     if (nodes.value.length === 0) {
@@ -140,6 +213,8 @@ export const useAppStore = defineStore('app', () => {
     isDark,
     activeNodeId,
     nodes,
+    topologySnapshot,
+    liveLog,
     nodeOptions,
     loading,
     token,
@@ -153,5 +228,7 @@ export const useAppStore = defineStore('app', () => {
     logout,
     checkAuth,
     fetchNodes,
+    connectLiveUpdates,
+    disconnectLiveUpdates,
   }
 })

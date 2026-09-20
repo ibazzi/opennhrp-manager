@@ -29,6 +29,7 @@ type NodeRecord struct {
 	NetworkHealth bool      `json:"network_health"`
 	ServiceAvail  bool      `json:"service_avail"`
 	ActiveSpokes  int       `json:"active_spokes"`
+	PeerCount     int       `json:"peer_count"`
 	WSRttMs       float64   `json:"ws_rtt_ms"`
 	ProbeMode     string    `json:"probe_mode"` // hybrid, agent_only, active_only
 	LastSeen      time.Time `json:"last_seen"`

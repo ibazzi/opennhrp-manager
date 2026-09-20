@@ -5,7 +5,6 @@
         <h2>Witness 见证仲裁与 GRE 质量监测 (SLA)</h2>
         <span class="sub-title">第三方独立 L3/L4 观测、防脑裂 Quorum 仲裁决策审计与网络质量矩阵</span>
       </div>
-      <n-button secondary @click="loadData">刷新监测数据</n-button>
     </div>
 
     <!-- Node SLA Matrix Cards -->
@@ -244,7 +243,6 @@ import {
   NCard,
   NTable,
   NTag,
-  NButton,
   NSelect,
   NScrollbar,
   NRadioGroup,
@@ -256,7 +254,7 @@ import { PulseOutline } from '@vicons/ionicons5'
 import { api } from '../api/client'
 import { useAppStore } from '../store'
 import ProbeLineChart from '../components/ProbeLineChart.vue'
-import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, SpokeInfo } from '../types'
+import type { SLAMatrixItem, ProbeRecord, ArbitrationRecord, SpokeInfo, TopologySnapshot } from '../types'
 
 const store = useAppStore()
 
@@ -361,29 +359,47 @@ const loadProbes = async () => {
   }
 }
 
-const loadData = async () => {
+const loadArbitrations = async () => {
   try {
-    const [sla, arb] = await Promise.all([
-      api.getSLAMatrix().catch(() => []),
-      api.getArbitrations(20).catch(() => []),
-    ])
-
-    slaList.value = Array.isArray(sla) ? sla : []
-    arbitrations.value = Array.isArray(arb) ? arb : []
+    const data = await api.getArbitrations(20)
+    arbitrations.value = Array.isArray(data) ? data : []
   } catch (e) {
     console.error('Failed to load witness data', e)
   } finally {
-    loading.value = false
+    if (!store.topologySnapshot) loading.value = false
   }
 }
 
+const applyTopology = (snapshot: TopologySnapshot | null) => {
+  if (!snapshot) return
+  slaList.value = snapshot.sla_matrix || []
+  if (snapshot.spokes_by_node) {
+    if (selectedNode.value === 'all') {
+      selectedSpokes.value = []
+      selectedSpokesError.value = ''
+    } else {
+      selectedSpokes.value = snapshot.spokes_by_node[selectedNode.value] || []
+      selectedSpokesError.value = ''
+    }
+    selectedSpokesLoading.value = false
+  }
+  loading.value = false
+}
+
 watch([selectedNode, probeLayer, timeHours], loadProbes)
-watch(selectedNode, loadSelectedSpokes)
+watch(selectedNode, () => {
+  if (store.topologySnapshot?.spokes_by_node) {
+    applyTopology(store.topologySnapshot)
+  } else {
+    loadSelectedSpokes()
+  }
+})
+watch(() => store.topologySnapshot, applyTopology, { immediate: true })
 
 onMounted(() => {
-  loadData()
+  loadArbitrations()
   loadProbes()
-  loadSelectedSpokes()
+  if (!store.topologySnapshot?.spokes_by_node) loadSelectedSpokes()
   if (store.nodes.length === 0) {
     store.fetchNodes()
   }

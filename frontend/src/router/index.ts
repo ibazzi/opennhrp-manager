@@ -4,6 +4,7 @@ import HubHA from '../views/HubHA.vue'
 import SpokeManagement from '../views/SpokeManagement.vue'
 import WitnessSLA from '../views/WitnessSLA.vue'
 import ConfigEditor from '../views/ConfigEditor.vue'
+import Audit from '../views/Audit.vue'
 import Login from '../views/Login.vue'
 import UserManagement from '../views/UserManagement.vue'
 
@@ -35,7 +36,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/managed-spokes',
     name: 'ManagedSpokes',
-    redirect: (to) => ({ path: '/spokes', query: { ...to.query, tab: 'managed' } }),
+    redirect: (to) => ({ path: '/spokes', query: { ...to.query, tab: undefined } }),
   },
   {
     path: '/witness',
@@ -47,7 +48,13 @@ const routes: RouteRecordRaw[] = [
     path: '/config',
     name: 'ConfigEditor',
     component: ConfigEditor,
-    meta: { title: '接口与配置中心', requiresAuth: true },
+    meta: { title: 'OpenNHRP 配置操作', requiresAuth: true },
+  },
+  {
+    path: '/audit',
+    name: 'Audit',
+    component: Audit,
+    meta: { title: '审计日志', requiresAuth: true },
   },
   {
     path: '/users',

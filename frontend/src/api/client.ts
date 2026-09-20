@@ -136,7 +136,7 @@ export const api = {
   purgeRedirect: (nodeId = '', protocol_address = '') =>
     http.post(`/spokes/redirect/purge?node_id=${nodeId}&protocol_address=${protocol_address}`).then((r) => r.data),
 
-  setSpokeMetadata: (data: { protocol_address: string; alias?: string; site_name?: string; contact?: string; notes?: string }) =>
+  setSpokeMetadata: (data: { protocol_address: string; alias?: string; notes?: string }) =>
     http.post('/spokes/metadata', data).then((r) => r.data),
 
   // Managed Spoke devices
@@ -145,6 +145,9 @@ export const api = {
 
   createManagedSpoke: (data: { id: string; name: string; protocol_address?: string }) =>
     http.post<{ spoke: ManagedSpoke; token: string }>('/managed-spokes', data).then((r) => r.data),
+
+  updateManagedSpokeName: (id: string, name: string) =>
+    http.patch(`/managed-spokes/${encodeURIComponent(id)}`, { name }).then((r) => r.data),
 
   rotateManagedSpokeToken: (id: string, protocolAddress = '') =>
     http.post<{ token: string }>(`/managed-spokes/${encodeURIComponent(id)}/token/rotate`, protocolAddress ? { protocol_address: protocolAddress } : undefined).then((r) => r.data),

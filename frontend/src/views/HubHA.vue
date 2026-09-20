@@ -157,7 +157,7 @@
         <n-table :bordered="false" :single-line="true" class="members-table">
           <thead>
             <tr>
-              <th>Member ID</th>
+              <th class="member-id-cell" style="width: 190px;">Member ID</th>
               <th style="width: 120px;">HA 会话</th>
               <th style="width: 170px;">Manager Agent</th>
               <th style="width: 110px;">成员资格</th>
@@ -178,9 +178,9 @@
               <td colspan="9" class="text-center text-muted">暂无可用的集群成员数据</td>
             </tr>
             <tr v-for="m in members" :key="m.member_id">
-              <td>
+              <td class="member-id-cell">
                 <div class="member-identity">
-                  <strong>{{ m.member_id }}</strong>
+                  <strong class="member-id-value" :title="m.member_id">{{ m.member_id }}</strong>
                   <n-tag v-if="m.member_id === cluster?.leader" size="small" type="success">LEADER</n-tag>
                   <n-tag v-else-if="m.member_id === cluster?.primary" size="small" type="info">PRIMARY</n-tag>
                 </div>
@@ -401,7 +401,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   NGrid,
   NGridItem,
@@ -432,7 +432,7 @@ import {
 } from '@vicons/ionicons5'
 import { api } from '../api/client'
 import { useAppStore } from '../store'
-import type { ClusterStatus, ReplicationStatus, MemberInfo, InviteRecord, KeyStatus } from '../types'
+import type { ClusterStatus, ReplicationStatus, MemberInfo, InviteRecord, KeyStatus, TopologySnapshot } from '../types'
 
 const store = useAppStore()
 const { message } = createDiscreteApi(['message'], {
@@ -568,28 +568,14 @@ function replicationDigest(memberId: string) {
   return replication.value?.peers.find((peer) => peer.member_id === memberId)?.digest
 }
 
-const loadData = async () => {
-  try {
-    await store.fetchNodes()
-    const targetNode = clusterTargetNodeId.value
-    if (!targetNode) return
-
-    const [c, r, inv, k] = await Promise.all([
-      api.getClusterStatus(targetNode),
-      api.getReplicationStatus(targetNode),
-      api.listInvites(targetNode),
-      api.getKeyStatus(targetNode),
-    ])
-    cluster.value = c
-    replication.value = r
-    members.value = c.members || []
-    invites.value = inv
-    keyStatus.value = k
-  } catch (e) {
-    console.error('Load HA data error', e)
-  } finally {
-    loading.value = false
-  }
+const applyTopology = (snapshot: TopologySnapshot | null) => {
+  if (!snapshot || snapshot.node_id !== store.activeNodeId) return
+  cluster.value = snapshot.cluster
+  replication.value = snapshot.replication || null
+  members.value = snapshot.cluster?.members || []
+  invites.value = snapshot.invites || []
+  keyStatus.value = snapshot.key_status || null
+  loading.value = false
 }
 
 const handleCreateInvite = async () => {
@@ -602,7 +588,6 @@ const handleCreateInvite = async () => {
     const res = await api.createInvite(clusterTargetNodeId.value, inviteForm.value)
     generatedToken.value = res.invite_token
     message.success('Invite 令牌创建成功')
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '创建 Invite 失败')
   } finally {
@@ -614,7 +599,6 @@ const handleRevokeInvite = async (idPrefix: string) => {
   try {
     await api.revokeInvite(clusterTargetNodeId.value, idPrefix)
     message.success('已撤销邀请')
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '撤销失败')
   }
@@ -624,7 +608,6 @@ const handleDeleteInvite = async (idPrefix: string) => {
   try {
     await api.deleteInvite(clusterTargetNodeId.value, idPrefix)
     message.success('已从集群状态中删除此邀请记录')
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '删除失败')
   }
@@ -647,7 +630,6 @@ const handleJoin = async () => {
     })
     message.success('成功加入 HA 集群！')
     showJoinModal.value = false
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '加入集群失败')
   } finally {
@@ -659,7 +641,6 @@ const handleFailback = async () => {
   try {
     await api.requestFailback(clusterTargetNodeId.value, true)
     message.success('已下发强制回切 Primary 请求')
-    loadData()
   } catch (e: any) {
     message.error('请求回切失败')
   }
@@ -669,7 +650,6 @@ const handleRotateKey = async (action: 'prepare' | 'commit') => {
   try {
     await api.rotateKey(clusterTargetNodeId.value, action)
     message.success(`密钥轮转 ${action} 成功`)
-    loadData()
   } catch (e: any) {
     message.error('密钥操作失败: ' + (e.response?.data?.error || ''))
   }
@@ -679,7 +659,6 @@ const handleSetMemberDisabled = async (memberId: string, disabled: boolean) => {
   try {
     await api.setMember(clusterTargetNodeId.value, { member_id: memberId, disabled })
     message.success(`已${disabled ? '禁用' : '启用'}节点 ${memberId}`)
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '操作失败')
   }
@@ -703,7 +682,6 @@ const handleSavePriority = async () => {
     })
     message.success(`节点 ${editingMember.value.member_id} 优先级已更新为 ${priorityForm.value.priority}`)
     showPriorityModal.value = false
-    loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '优先级更新失败')
   } finally {
@@ -711,26 +689,33 @@ const handleSavePriority = async () => {
   }
 }
 
-let timer: number | null = null
-
-onMounted(() => {
-  loadData()
-  timer = window.setInterval(loadData, 3000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-})
+watch(() => store.topologySnapshot, applyTopology, { immediate: true })
 </script>
 
 <style scoped>
 .members-table {
-  min-width: 1500px;
+  min-width: 1600px;
 }
 
 .members-table th, .members-table td {
   padding: 14px 16px;
   vertical-align: middle;
+}
+
+.members-table th.member-id-cell,
+.members-table td.member-id-cell {
+  min-width: 190px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.member-id-value {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-identity, .member-actions {

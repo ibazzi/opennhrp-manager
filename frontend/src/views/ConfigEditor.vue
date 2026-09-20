@@ -1,42 +1,23 @@
 <template>
-  <div class="page-container">
+  <div class="page-container config-page">
     <div class="page-header">
       <div>
-        <h2>接口与配置中心</h2>
-        <span class="sub-title">OpenNHRP 接口配置、配置文件在线编辑与热重载、操作审计追溯</span>
+        <h2>OpenNHRP 配置与操作</h2>
+        <span class="sub-title">统一管理 Hub 与 Spoke 的接口、配置文件、Map 和进程缓存</span>
       </div>
       <n-space align="center">
         <n-select
-          v-model:value="store.activeNodeId"
-          :options="store.nodeOptions"
-          placeholder="选择配置节点"
+          v-model:value="selectedNodeId"
+          :options="processNodeOptions"
+          placeholder="选择 OpenNHRP 节点"
           style="width: 250px;"
-          @update:value="loadData"
         />
-        <n-button
-          type="warning"
-          secondary
-          :disabled="!store.isAdmin"
-          :title="!store.isAdmin ? '只读用户无权操作' : ''"
-          @click="handleReloadConfig"
-        >
-          热重载配置 (Reload)
-        </n-button>
-        <n-button
-          type="primary"
-          :loading="saving"
-          :disabled="!store.isAdmin"
-          :title="!store.isAdmin ? '只读用户无权操作' : ''"
-          @click="handleSaveConfig"
-        >
-          保存配置文件 (Save)
-        </n-button>
       </n-space>
     </div>
 
     <!-- Interfaces Table -->
-    <n-card title="OpenNHRP 接口 (Interfaces)" class="mb-4">
-      <n-scrollbar x-scrollable>
+    <n-card title="OpenNHRP 接口 (Interfaces)" class="mb-4 interfaces-card">
+      <div class="interfaces-table-scroll">
         <n-table :bordered="false" :single-line="true" style="min-width: 640px;">
           <thead>
             <tr>
@@ -60,124 +41,162 @@
             </tr>
           </tbody>
         </n-table>
-      </n-scrollbar>
+      </div>
     </n-card>
 
     <!-- Config Editor Card -->
-    <n-card title="OpenNHRP 配置文件编辑 (opennhrp.conf)" class="mb-4">
+    <n-card title="OpenNHRP 配置文件编辑 (opennhrp.conf)" class="editor-card">
+      <template #header-extra>
+        <n-space class="editor-actions" :wrap="true" justify="end">
+          <n-button type="primary" secondary :disabled="!canOperate" @click="showAddMapModal = true">添加静态映射</n-button>
+          <n-popconfirm :disabled="!canOperate || !operationInterface" @positive-click="handleSaveMap">
+            <template #trigger>
+              <n-button type="warning" secondary :disabled="!canOperate || !operationInterface">保存 Map</n-button>
+            </template>
+            确认在 {{ selectedNode?.name || selectedNodeId }} 的 {{ operationInterface }} 接口持久化当前 Map？
+          </n-popconfirm>
+          <n-popconfirm :disabled="!canOperate" @positive-click="handlePurgeRedirect">
+            <template #trigger>
+              <n-button type="error" secondary :disabled="!canOperate">清除重定向缓存</n-button>
+            </template>
+            确认清理 {{ selectedNode?.name || selectedNodeId }} 进程的全部重定向与限流缓存？
+          </n-popconfirm>
+          <n-button
+            type="warning"
+            secondary
+            :disabled="!canOperate"
+            :title="!store.isAdmin ? '只读用户无权操作' : ''"
+            @click="handleReloadConfig"
+          >
+            热重载配置 (Reload)
+          </n-button>
+          <n-button
+            type="primary"
+            :loading="saving"
+            :disabled="!canOperate"
+            :title="!store.isAdmin ? '只读用户无权操作' : ''"
+            @click="handleSaveConfig"
+          >
+            保存配置文件 (Save)
+          </n-button>
+        </n-space>
+      </template>
       <div class="editor-wrapper">
         <n-input
+          class="config-input"
           v-model:value="configContent"
           type="textarea"
-          rows="14"
+          :autosize="false"
           placeholder="正在读取当前节点配置文件..."
           style="font-family: 'Fira Code', monospace; font-size: 13px;"
         />
       </div>
-      <div class="editor-footer mt-2">
-        <n-input
-          v-model:value="saveComment"
-          placeholder="可选：输入修改备注（将记录至审计日志）"
-          style="width: 380px; max-width: 100%;"
-        />
-      </div>
     </n-card>
 
-    <!-- Audit Logs -->
-    <n-card title="配置操作与审计历史 (Audit Logs)">
-      <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 850px;">
-          <thead>
-            <tr>
-              <th style="width: 170px;">操作时间</th>
-              <th style="width: 160px;">节点 ID</th>
-              <th style="width: 130px;">操作类型</th>
-              <th style="width: 100px;">执行人</th>
-              <th class="allow-wrap">备注 / 详情</th>
-              <th style="width: 90px;">结果</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="auditLogs.length === 0">
-              <td colspan="6" class="text-center text-muted">暂无历史操作记录</td>
-            </tr>
-            <tr v-for="log in auditLogs" :key="log.id">
-              <td>{{ new Date(log.created_at).toLocaleString() }}</td>
-              <td><code>{{ log.node_id }}</code></td>
-              <td><n-tag size="tiny" type="info">{{ log.action }}</n-tag></td>
-              <td>{{ log.operator }}</td>
-              <td class="allow-wrap">{{ log.detail || '-' }}</td>
-              <td>
-                <n-tag size="tiny" :type="log.success ? 'success' : 'error'">
-                  {{ log.success ? 'SUCCESS' : 'FAILED' }}
-                </n-tag>
-              </td>
-            </tr>
-          </tbody>
-        </n-table>
-      </n-scrollbar>
-    </n-card>
+    <n-modal v-model:show="showAddMapModal" preset="card" title="添加静态 NHRP 映射" style="width: 480px; max-width: calc(100vw - 32px);">
+      <n-form label-placement="left" label-width="120">
+        <n-form-item label="目标节点"><n-input :value="`${selectedNode?.name || selectedNodeId} (${selectedNodeId})`" disabled /></n-form-item>
+        <n-form-item label="隧道接口" required><n-select v-model:value="mapForm.interface" :options="interfaceOptions" /></n-form-item>
+        <n-form-item label="Protocol IP" required><n-input v-model:value="mapForm.protocol_address" /></n-form-item>
+        <n-form-item label="NBMA 地址" required><n-input v-model:value="mapForm.nbma_address" /></n-form-item>
+        <n-form-item label="自动注册"><n-switch v-model:value="mapForm.register" /></n-form-item>
+      </n-form>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showAddMapModal = false">取消</n-button>
+          <n-button type="primary" :loading="operating" @click="handleAddMap">添加</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import {
   NCard,
   NButton,
+  NForm,
+  NFormItem,
   NTable,
   NTag,
   NInput,
+  NModal,
+  NPopconfirm,
   NSelect,
-  NScrollbar,
   NSpace,
+  NSwitch,
   useMessage,
 } from 'naive-ui'
 import { api } from '../api/client'
 import { useAppStore } from '../store'
-import type { InterfaceInfo, AuditLog } from '../types'
+import { isHubNode } from '../utils/topologyStatus'
+import type { InterfaceInfo } from '../types'
 
 const store = useAppStore()
 const message = useMessage()
+const selectedNodeId = ref('')
 const interfaces = ref<InterfaceInfo[]>([])
 const configContent = ref('')
-const saveComment = ref('')
+const loadedConfigContent = ref('')
 const saving = ref(false)
-const auditLogs = ref<AuditLog[]>([])
+const operating = ref(false)
+const showAddMapModal = ref(false)
+const operationInterface = ref('')
+const mapForm = ref({ interface: '', protocol_address: '', nbma_address: '', register: true })
+const processNodes = computed(() => store.nodes.filter((node) => node.type === 'spoke' || isHubNode(node)))
+const selectedNode = computed(() => processNodes.value.find((node) => node.id === selectedNodeId.value))
+const canOperate = computed(() => store.isAdmin && selectedNode.value?.status !== 'offline' && !!selectedNodeId.value)
+const processNodeOptions = computed(() => processNodes.value.map((node) => ({
+  label: `${node.name || node.id} (${node.type === 'spoke' ? 'Spoke' : 'Hub'} · ${node.status === 'online' ? '在线' : node.status === 'degraded' ? '降级' : '离线'})`,
+  value: node.id,
+  disabled: node.status === 'offline',
+})))
+const interfaceOptions = computed(() => interfaces.value.map((item) => ({ label: item.name, value: item.name })))
 
-const loadData = async () => {
+const ensureSelectedNode = () => {
+  if (processNodes.value.some((node) => node.id === selectedNodeId.value && node.status !== 'offline')) return
+  selectedNodeId.value = processNodes.value.find((node) => node.id === store.activeNodeId && node.status !== 'offline')?.id
+    || processNodes.value.find((node) => node.status !== 'offline')?.id
+    || ''
+}
+
+const loadData = async (preserveDraft = false) => {
   try {
-    const targetNode = store.activeNodeId
-    const [ifaces, conf, logs] = await Promise.all([
+    const targetNode = selectedNodeId.value
+    if (!targetNode) return
+    const [ifaces, conf] = await Promise.all([
       api.listInterfaces(targetNode),
       api.getConfigFile(targetNode),
-      api.getAuditLogs(20),
     ])
     interfaces.value = ifaces
-    configContent.value = conf.content
-    auditLogs.value = logs.items
+    if (!ifaces.some((item) => item.name === operationInterface.value)) operationInterface.value = ifaces[0]?.name || ''
+    if (!ifaces.some((item) => item.name === mapForm.value.interface)) mapForm.value.interface = ifaces[0]?.name || ''
+    if (!preserveDraft || configContent.value === loadedConfigContent.value) configContent.value = conf.content
+    loadedConfigContent.value = conf.content
   } catch (e) {
     console.error('Failed to load config center data', e)
   }
 }
 
 watch(
-  () => store.activeNodeId,
+  selectedNodeId,
   () => {
     loadData()
   }
 )
 
+watch(processNodes, ensureSelectedNode)
+
 const handleSaveConfig = async () => {
   saving.value = true
   try {
-    const targetNode = store.activeNodeId
+    const targetNode = selectedNodeId.value
     await api.saveConfigFile(targetNode, {
       content: configContent.value,
-      comment: saveComment.value || 'Web 控制台修改配置',
+      comment: 'Web 控制台修改配置',
     })
     message.success('配置文件已成功写入节点并备份')
-    saveComment.value = ''
     loadData()
   } catch (e: any) {
     message.error(e.response?.data?.error || '保存失败')
@@ -188,7 +207,7 @@ const handleSaveConfig = async () => {
 
 const handleReloadConfig = async () => {
   try {
-    const targetNode = store.activeNodeId
+    const targetNode = selectedNodeId.value
     await api.reloadConfig(targetNode)
     message.success('已通知 OpenNHRP 热重载配置')
     loadData()
@@ -197,11 +216,60 @@ const handleReloadConfig = async () => {
   }
 }
 
-onMounted(loadData)
+const handleAddMap = async () => {
+  if (!mapForm.value.interface || !mapForm.value.protocol_address || !mapForm.value.nbma_address) {
+    message.error('请填写完整的接口和地址')
+    return
+  }
+  operating.value = true
+  try {
+    await api.addStaticMap(selectedNodeId.value, mapForm.value)
+    message.success('静态 Map 添加成功')
+    showAddMapModal.value = false
+    mapForm.value.protocol_address = ''
+    mapForm.value.nbma_address = ''
+    await loadData(true)
+  } catch (e: any) {
+    message.error(e.response?.data?.error || '添加失败')
+  } finally {
+    operating.value = false
+  }
+}
+
+const handleSaveMap = async () => {
+  try {
+    await api.saveMap(selectedNodeId.value, operationInterface.value)
+    message.success('当前 Map 已持久化')
+    await loadData(true)
+  } catch (e: any) {
+    message.error(e.response?.data?.error || '保存 Map 失败')
+  }
+}
+
+const handlePurgeRedirect = async () => {
+  try {
+    await api.purgeRedirect(selectedNodeId.value)
+    message.success('重定向与限流缓存已清除')
+    await loadData(true)
+  } catch (e: any) {
+    message.error(e.response?.data?.error || '清除缓存失败')
+  }
+}
+
+onMounted(() => {
+  ensureSelectedNode()
+  loadData()
+})
 </script>
 
 <style scoped>
 .page-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  min-height: 0;
+  overflow: hidden;
   padding: 24px;
 }
 
@@ -227,17 +295,48 @@ onMounted(loadData)
   margin-bottom: 16px;
 }
 
-.mt-2 {
-  margin-top: 8px;
+.interfaces-card {
+  flex: 0 0 auto;
+}
+
+.interfaces-table-scroll {
+  overflow-x: auto;
+}
+
+.editor-card {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.editor-card :deep(.n-card-content) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .editor-wrapper {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   border-radius: 6px;
 }
 
-.editor-footer {
-  display: flex;
-  justify-content: flex-end;
+.editor-wrapper :deep(.config-input),
+.editor-wrapper :deep(.n-input),
+.editor-wrapper :deep(.n-input-wrapper),
+.editor-wrapper :deep(.n-input__textarea),
+.editor-wrapper :deep(.n-input__textarea .n-scrollbar-container),
+.editor-wrapper :deep(.n-input__textarea .n-scrollbar-content),
+.editor-wrapper :deep(textarea) {
+  height: 100% !important;
+  min-height: 0;
+}
+
+.editor-wrapper :deep(textarea) {
+  resize: none;
 }
 
 .text-center {
@@ -268,11 +367,11 @@ onMounted(loadData)
     width: 100% !important;
     justify-content: center !important;
   }
-  .editor-footer {
+  .editor-actions {
     justify-content: stretch;
   }
-  .editor-footer .n-input {
-    width: 100% !important;
+  .editor-actions > * {
+    flex: 1 1 auto;
   }
 }
 </style>

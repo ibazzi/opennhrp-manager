@@ -42,7 +42,7 @@ func SetupRouter(
 	managedSpokeHandler := NewManagedSpokeHandler(nodeMgr, database)
 	agentWSHandler := NewAgentWSHandler(cfg, database, nodeMgr, logHub)
 	logWSHandler := NewLogWSHandler(logHub)
-	topologyWSHandler := NewTopologyWSHandler(nodeMgr, witnessSvc)
+	topologyWSHandler := NewTopologyWSHandler(nodeMgr, witnessSvc, logHub, spokeHandler)
 
 	authRequired := AuthRequired(cfg.JWTSecret)
 	adminOnly := AdminOnly()
@@ -114,6 +114,7 @@ func SetupRouter(
 				managedSpokeGroup.GET("/:id/ha", managedSpokeHandler.HA)
 				managedSpokeGroup.POST("/:id/ha/mode", adminOnly, managedSpokeHandler.SetHAMode)
 				managedSpokeGroup.POST("", adminOnly, managedSpokeHandler.Create)
+				managedSpokeGroup.PATCH("/:id", adminOnly, managedSpokeHandler.Update)
 				managedSpokeGroup.POST("/:id/token/rotate", adminOnly, managedSpokeHandler.RotateToken)
 				managedSpokeGroup.DELETE("/:id", adminOnly, managedSpokeHandler.Delete)
 			}

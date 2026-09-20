@@ -73,19 +73,6 @@
                     </div>
                   </div>
                   <div class="header-actions">
-                    <n-tag
-                      v-if="!isMobile"
-                      type="success"
-                      size="small"
-                      round
-                      style="cursor: pointer;"
-                      title="点击跳转至 Witness 见证仲裁与 SLA 质量中心"
-                      @click="router.push('/witness')"
-                    >
-                      <n-icon><ShieldCheckmarkOutline /></n-icon>
-                      见证仲裁 Active
-                    </n-tag>
-
                     <!-- User Profile Dropdown -->
                     <n-dropdown
                       trigger="click"
@@ -166,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, onMounted, onUnmounted, type Component } from 'vue'
+import { ref, computed, h, onMounted, onUnmounted, watch, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   NConfigProvider,
@@ -196,6 +183,7 @@ import {
 } from 'naive-ui'
 import {
   EyeOutline,
+  DocumentTextOutline,
   GitNetworkOutline,
   KeyOutline,
   LogOutOutline,
@@ -287,35 +275,40 @@ const handleChangePassword = async () => {
 const menuOptions = computed(() => {
   const list = [
     {
-      label: '仪表盘概览',
+      label: '仪表盘',
       key: '/',
       icon: renderIcon(SpeedometerOutline),
     },
     {
-      label: 'Hub HA 集群管理',
+      label: 'Hub HA',
       key: '/ha',
       icon: renderIcon(GitNetworkOutline),
     },
     {
-      label: 'Spoke 管理',
+      label: 'Spoke',
       key: '/spokes',
       icon: renderIcon(PulseOutline),
     },
     {
-      label: 'Witness 仲裁与 SLA',
+      label: 'Witness SLA',
       key: '/witness',
       icon: renderIcon(ShieldCheckmarkOutline),
     },
     {
-      label: '接口与配置中心',
+      label: '配置操作',
       key: '/config',
       icon: renderIcon(SettingsOutline),
+    },
+    {
+      label: '审计日志',
+      key: '/audit',
+      icon: renderIcon(DocumentTextOutline),
     },
   ]
 
   if (store.isAdmin) {
     list.push({
-      label: '用户与权限管理',
+      label: '用户管理',
       key: '/users',
       icon: renderIcon(PeopleOutline),
     })
@@ -340,17 +333,31 @@ const handleMenuSelect = (key: string) => {
   router.push(key)
 }
 
-onMounted(() => {
+const syncLiveConnection = () => {
+  if (!store.isLoggedIn || route.path === '/config' || route.path === '/audit' || route.path === '/users') {
+    store.disconnectLiveUpdates()
+    return
+  }
+  store.connectLiveUpdates(route.path === '/ha')
+}
+
+watch(() => route.path, syncLiveConnection)
+
+onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
   if (store.isLoggedIn) {
-    store.checkAuth()
-    store.fetchNodes()
+    const user = await store.checkAuth()
+    if (user) {
+      await store.fetchNodes()
+      syncLiveConnection()
+    }
   }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  store.disconnectLiveUpdates()
 })
 </script>
 

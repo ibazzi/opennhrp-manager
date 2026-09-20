@@ -198,6 +198,7 @@ type SpokeInfo struct {
 	ExpiresInSec     int        `json:"expires_in_sec"`
 	LastSeen         *time.Time `json:"last_seen,omitempty"`
 	Alias            string     `json:"alias,omitempty"`
+	Notes            string     `json:"notes,omitempty"`
 	SiteName         string     `json:"site_name,omitempty"`
 	ManagedNodeID    string     `json:"managed_node_id,omitempty"`
 	ManagedNodeName  string     `json:"managed_node_name,omitempty"`

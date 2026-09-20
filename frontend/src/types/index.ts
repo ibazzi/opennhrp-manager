@@ -217,6 +217,7 @@ export interface SpokeInfo {
   expires_in_sec: number
   last_seen?: string
   alias?: string
+  notes?: string
   site_name?: string
   managed_node_id?: string
   managed_node_name?: string
@@ -252,6 +253,7 @@ export interface NodeRecord {
   network_health?: boolean
   service_avail?: boolean
   active_spokes?: number
+  peer_count?: number
   ws_rtt_ms?: number
   probe_mode?: 'hybrid' | 'agent_only' | 'active_only'
   last_seen: string
@@ -289,7 +291,12 @@ export interface TopologySnapshot {
   node_id: string
   nodes: NodeRecord[]
   cluster: ClusterStatus | null
+  replication?: ReplicationStatus | null
+  invites?: InviteRecord[]
+  key_status?: KeyStatus | null
   spokes: SpokeInfo[]
+  spokes_by_node?: Record<string, SpokeInfo[]>
+  spoke_failures?: string[]
   sla_matrix: SLAMatrixItem[]
   witness_quorum: WitnessQuorumStatus
   timestamp: string

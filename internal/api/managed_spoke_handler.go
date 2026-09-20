@@ -159,7 +159,40 @@ func (h *ManagedSpokeHandler) Create(c *gin.Context) {
 		return
 	}
 	h.database.AddAuditLog(req.ID, c.GetString("username"), "create_managed_spoke", req.Name, true, "")
+	if h.nodeMgr != nil {
+		h.nodeMgr.NotifyTopology()
+	}
 	c.JSON(http.StatusCreated, gin.H{"spoke": managedSpokeView{ID: req.ID, Name: req.Name, Status: "offline", ProtocolAddress: protocolAddress}, "token": token})
+}
+
+func (h *ManagedSpokeHandler) Update(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if nameLen := utf8.RuneCountInString(req.Name); nameLen == 0 || nameLen > 128 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "显示名称不能为空，且不能超过 128 个字符"})
+		return
+	}
+	result, err := h.database.Exec(`UPDATE nodes SET name=?, updated_at=? WHERE id=? AND type='spoke'`, req.Name, time.Now(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "managed spoke not found"})
+		return
+	}
+	h.database.AddAuditLog(id, c.GetString("username"), "update_managed_spoke_name", req.Name, true, "")
+	if h.nodeMgr != nil {
+		h.nodeMgr.NotifyTopology()
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func (h *ManagedSpokeHandler) RotateToken(c *gin.Context) {
@@ -208,8 +241,13 @@ func (h *ManagedSpokeHandler) RotateToken(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "managed spoke not found"})
 		return
 	}
-	h.nodeMgr.DisconnectAgent(id)
+	if h.nodeMgr != nil {
+		h.nodeMgr.DisconnectAgent(id)
+	}
 	h.database.AddAuditLog(id, c.GetString("username"), "rotate_managed_spoke_token", "", true, "")
+	if h.nodeMgr != nil {
+		h.nodeMgr.NotifyTopology()
+	}
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
@@ -224,8 +262,13 @@ func (h *ManagedSpokeHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "managed spoke not found"})
 		return
 	}
-	h.nodeMgr.DisconnectAgent(id)
+	if h.nodeMgr != nil {
+		h.nodeMgr.DisconnectAgent(id)
+	}
 	h.database.AddAuditLog(id, c.GetString("username"), "delete_managed_spoke", "", true, "")
+	if h.nodeMgr != nil {
+		h.nodeMgr.NotifyTopology()
+	}
 	c.Status(http.StatusNoContent)
 	c.Writer.WriteHeaderNow()
 }

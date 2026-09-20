@@ -48,13 +48,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { NButton, NScrollbar } from 'naive-ui'
+import { useAppStore } from '../store'
 
 const props = defineProps<{
   title?: string
   nodeId?: string
 }>()
+const store = useAppStore()
 
 interface LogItem {
   time: string
@@ -67,8 +69,6 @@ const logs = ref<LogItem[]>([])
 const isPaused = ref(false)
 const isWrap = ref(false)
 const scrollbarRef = ref<any>(null)
-let ws: WebSocket | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 
 const toggleWrap = () => {
   isWrap.value = !isWrap.value
@@ -81,63 +81,25 @@ const clearLogs = () => {
   logs.value = []
 }
 
-const connectWS = () => {
-  const token = localStorage.getItem('opennhrp_token')
-  if (!token) return
-
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${protocol}//${window.location.host}/api/logs/ws?token=${encodeURIComponent(token)}`
-
-  ws = new WebSocket(wsUrl)
-
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      if (props.nodeId && data.node_id !== props.nodeId) return
-      const item: LogItem = {
-        time: new Date(data.timestamp || Date.now()).toLocaleTimeString(),
-        source: [data.node_id, data.source].filter(Boolean).join('/') || 'system',
-        level: data.level || 'INFO',
-        message: data.message,
-      }
-
-      logs.value.push(item)
-      if (logs.value.length > 500) {
-        logs.value.shift()
-      }
-
-      if (!isPaused.value) {
-        nextTick(() => {
-          scrollbarRef.value?.scrollTo({ position: 'bottom', silent: true })
-        })
-      }
-    } catch (e) {
-      console.error('Parse log error', e)
-    }
+watch(
+  () => store.liveLog,
+  (data) => {
+    if (!data || (props.nodeId && data.node_id !== props.nodeId)) return
+    logs.value.push({
+      time: new Date(data.timestamp || Date.now()).toLocaleTimeString(),
+      source: [data.node_id, data.source].filter(Boolean).join('/') || 'system',
+      level: data.level || 'INFO',
+      message: data.message,
+    })
+    if (logs.value.length > 500) logs.value.shift()
+    if (!isPaused.value) nextTick(() => scrollbarRef.value?.scrollTo({ position: 'bottom', silent: true }))
   }
-
-  ws.onclose = () => {
-    const currentToken = localStorage.getItem('opennhrp_token')
-    if (currentToken) {
-      reconnectTimer = setTimeout(connectWS, 3000)
-    }
-  }
-}
+)
 
 onMounted(() => {
   const savedWrap = localStorage.getItem('terminal_log_wrap')
   if (savedWrap !== null) {
     isWrap.value = savedWrap === 'true'
-  }
-  connectWS()
-})
-
-onUnmounted(() => {
-  clearTimeout(reconnectTimer)
-  if (ws) {
-    ws.onclose = null
-    ws.close()
-    ws = null
   }
 })
 </script>

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -57,37 +58,58 @@ func (h *SpokeHandler) ListSpokes(c *gin.Context) {
 	nodeID := c.Query("node_id")
 	iface := c.DefaultQuery("interface", "")
 
+	spokes, err := h.listSpokes(c.Request.Context(), nodeID, iface)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, spokes)
+}
+
+func (h *SpokeHandler) listSpokes(ctx context.Context, nodeID, iface string) ([]executor.SpokeInfo, error) {
 	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
 	if err != nil {
-		h.writeCachedSpokes(c, nodeID, iface, err)
-		return
+		if spokes, ok := h.cachedSpokes(nodeID, iface); ok {
+			return spokes, nil
+		}
+		return nil, err
 	}
 
-	spokes, err := exec.ListSpokes(c.Request.Context(), iface)
+	spokes, err := exec.ListSpokes(ctx, iface)
 	if err != nil {
-		h.writeCachedSpokes(c, exec.GetNodeID(), iface, err)
-		return
+		if cached, ok := h.cachedSpokes(exec.GetNodeID(), iface); ok {
+			return cached, nil
+		}
+		return nil, err
 	}
 
-	// Attach metadata from DB if available
-	rows, _ := h.database.Query("SELECT protocol_address, alias, site_name FROM spoke_metadata")
+	h.decorateSpokes(spokes)
+	h.nodeMgr.CacheSpokes(exec.GetNodeID(), iface, spokes)
+	if nodeID != "" && nodeID != exec.GetNodeID() {
+		h.nodeMgr.CacheSpokes(nodeID, iface, spokes)
+	}
+	return spokes, nil
+}
+
+func (h *SpokeHandler) decorateSpokes(spokes []executor.SpokeInfo) {
+	rows, _ := h.database.Query("SELECT protocol_address, alias, site_name, notes FROM spoke_metadata")
 	if rows != nil {
-		metaMap := make(map[string]struct{ Alias, Site string })
+		metaMap := make(map[string]struct{ Alias, Site, Notes string })
 		for rows.Next() {
-			var ip, alias, site string
-			_ = rows.Scan(&ip, &alias, &site)
-			metaMap[ip] = struct{ Alias, Site string }{Alias: alias, Site: site}
+			var ip, alias, site, notes string
+			_ = rows.Scan(&ip, &alias, &site, &notes)
+			metaMap[ip] = struct{ Alias, Site, Notes string }{Alias: alias, Site: site, Notes: notes}
 		}
 		for i := range spokes {
 			if meta, exists := metaMap[spokes[i].ProtocolAddress]; exists {
 				spokes[i].Alias = meta.Alias
+				spokes[i].Notes = meta.Notes
 				spokes[i].SiteName = meta.Site
 			}
 		}
 		_ = rows.Close()
 	}
 
-	// Sort spokes by protocol IP address ascending
 	sort.Slice(spokes, func(i, j int) bool {
 		ipA := net.ParseIP(strings.Split(spokes[i].ProtocolAddress, "/")[0])
 		ipB := net.ParseIP(strings.Split(spokes[j].ProtocolAddress, "/")[0])
@@ -96,31 +118,28 @@ func (h *SpokeHandler) ListSpokes(c *gin.Context) {
 		}
 		return spokes[i].ProtocolAddress < spokes[j].ProtocolAddress
 	})
-	h.nodeMgr.CacheSpokes(exec.GetNodeID(), iface, spokes)
-	if nodeID != "" && nodeID != exec.GetNodeID() {
-		h.nodeMgr.CacheSpokes(nodeID, iface, spokes)
-	}
-
 	h.attachManagedSpokes(spokes)
-	c.JSON(http.StatusOK, spokes)
 }
 
-func (h *SpokeHandler) writeCachedSpokes(c *gin.Context, nodeID, iface string, cause error) {
+func (h *SpokeHandler) cachedSpokes(nodeID, iface string) ([]executor.SpokeInfo, bool) {
 	spokes, ok := h.nodeMgr.GetCachedSpokes(nodeID, iface)
 	if !ok {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": cause.Error()})
-		return
+		return nil, false
 	}
 	for i := range spokes {
 		spokes[i].Stale = true
 	}
-	h.attachManagedSpokes(spokes)
-	c.JSON(http.StatusOK, spokes)
+	h.decorateSpokes(spokes)
+	return spokes, true
+}
+
+func isHubNode(node db.NodeRecord) bool {
+	return node.ID != "local" && node.Type != "local" && node.Type != "spoke" && node.Role != "witness"
 }
 
 func (h *SpokeHandler) AddStaticMap(c *gin.Context) {
 	nodeID := c.Query("node_id")
-	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
+	exec, err := h.nodeMgr.GetOpenNHRPExecutor(nodeID)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No opennhrp-agent connected: " + err.Error()})
 		return
@@ -148,7 +167,7 @@ func (h *SpokeHandler) AddStaticMap(c *gin.Context) {
 
 func (h *SpokeHandler) DelStaticMap(c *gin.Context) {
 	nodeID := c.Query("node_id")
-	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
+	exec, err := h.nodeMgr.GetOpenNHRPExecutor(nodeID)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No opennhrp-agent connected: " + err.Error()})
 		return
@@ -175,7 +194,7 @@ func (h *SpokeHandler) DelStaticMap(c *gin.Context) {
 func (h *SpokeHandler) SaveMap(c *gin.Context) {
 	nodeID := c.Query("node_id")
 	iface := c.DefaultQuery("interface", "gre-ha")
-	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
+	exec, err := h.nodeMgr.GetOpenNHRPExecutor(nodeID)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No opennhrp-agent connected: " + err.Error()})
 		return
@@ -192,7 +211,7 @@ func (h *SpokeHandler) SaveMap(c *gin.Context) {
 
 func (h *SpokeHandler) UpdateNBMA(c *gin.Context) {
 	nodeID := c.Query("node_id")
-	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
+	exec, err := h.nodeMgr.GetOpenNHRPExecutor(nodeID)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No opennhrp-agent connected: " + err.Error()})
 		return
@@ -219,7 +238,7 @@ func (h *SpokeHandler) UpdateNBMA(c *gin.Context) {
 func (h *SpokeHandler) PurgeRedirect(c *gin.Context) {
 	nodeID := c.Query("node_id")
 	protoIP := c.Query("protocol_address")
-	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
+	exec, err := h.nodeMgr.GetOpenNHRPExecutor(nodeID)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No opennhrp-agent connected: " + err.Error()})
 		return
@@ -251,6 +270,9 @@ func (h *SpokeHandler) SetSpokeMetadata(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if h.nodeMgr != nil {
+		h.nodeMgr.NotifyTopology()
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }

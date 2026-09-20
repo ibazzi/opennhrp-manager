@@ -26,4 +26,20 @@ func TestNodeManagerCachesLastSuccessfulHubView(t *testing.T) {
 	if !ok || len(cachedSpokes) != 1 || cachedSpokes[0].ProtocolAddress != "10.20.0.2/32" {
 		t.Fatalf("unexpected cached spokes: %#v", cachedSpokes)
 	}
+	mgr.CacheSpokes("hub-secondary", "gre-ha", spokes)
+	byNode := mgr.GetCachedSpokesByNode()
+	if len(byNode["hub-primary"]) != 1 || byNode["hub-secondary"] != nil {
+		t.Fatalf("unexpected spokes by node: %#v", byNode)
+	}
+	replication := &executor.ReplicationStatusInfo{
+		LocalIndex: 7,
+		Peers:      []executor.ReplicationPeerInfo{{MemberID: "hub-secondary", Lag: 1}},
+	}
+	invites := []executor.InviteRecord{{IDPrefix: "abc123", MemberID: "hub-new"}}
+	keyStatus := &executor.KeyStatusInfo{CurrentKeyID: "key-1"}
+	mgr.CacheHAStatus("hub-primary", replication, invites, keyStatus)
+	gotReplication, gotInvites, gotKeyStatus := mgr.GetCachedHAStatus("hub-primary")
+	if gotReplication == nil || gotReplication.LocalIndex != 7 || len(gotReplication.Peers) != 1 || len(gotInvites) != 1 || gotKeyStatus == nil || gotKeyStatus.CurrentKeyID != "key-1" {
+		t.Fatalf("unexpected cached HA status: %v, %#v, %#v", gotReplication, gotInvites, gotKeyStatus)
+	}
 }

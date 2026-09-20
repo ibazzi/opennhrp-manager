@@ -21,7 +21,6 @@
               网关探测: {{ networkHealthText }}
             </n-tag>
           </template>
-          <n-button size="small" secondary @click="refreshData">刷新数据</n-button>
         </n-space>
       </div>
     </div>
@@ -189,14 +188,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   NGrid,
   NGridItem,
   NCard,
   NTag,
   NBadge,
-  NButton,
   NTable,
   NSpace,
   NScrollbar,
@@ -207,11 +205,10 @@ import {
 import { CheckmarkCircleOutline, CloseCircleOutline, PulseOutline, TrophyOutline } from '@vicons/ionicons5'
 import TopologyGraph from '../components/TopologyGraph.vue'
 import TerminalLog from '../components/TerminalLog.vue'
-import { api } from '../api/client'
 import { useAppStore } from '../store'
 import { sortSpokesByIP } from '../utils/ip'
 import { formatWitnessQuorumStatus } from '../utils/topologyStatus'
-import type { ClusterStatus, SpokeInfo, SLAMatrixItem, TopologySnapshot, WitnessQuorumStatus } from '../types'
+import type { ClusterStatus, SpokeInfo, SLAMatrixItem, WitnessQuorumStatus } from '../types'
 
 const store = useAppStore()
 const message = useMessage()
@@ -275,80 +272,18 @@ const formatRole = (role?: string) => {
   }
 }
 
-const refreshData = async () => {
-  try {
-    await store.fetchNodes()
-    const targetNode = store.activeNodeId
-    const [statusData, spokesData, slaData, quorumData] = await Promise.all([
-      api.getClusterStatus(targetNode),
-      api.listSpokes(targetNode),
-      api.getSLAMatrix(),
-      api.getWitnessQuorum().catch(() => null),
-    ])
-    cluster.value = statusData
-    spokes.value = sortSpokesByIP(spokesData)
-    slaMatrix.value = slaData
-    witnessQuorum.value = quorumData
-  } catch (e) {
-    console.error('Refresh dashboard error', e)
-  } finally {
-    loading.value = false
-  }
-}
-
 watch(
-  () => store.activeNodeId,
-  () => {
-    connectTopologyWS()
-  }
-)
-
-let topologyWS: WebSocket | null = null
-let reconnectTimer: number | null = null
-
-const closeTopologyWS = () => {
-  if (reconnectTimer) window.clearTimeout(reconnectTimer)
-  reconnectTimer = null
-  if (topologyWS) {
-    topologyWS.onclose = null
-    topologyWS.close()
-    topologyWS = null
-  }
-}
-
-const connectTopologyWS = () => {
-  closeTopologyWS()
-  const token = localStorage.getItem('opennhrp_token')
-  if (!token || !store.activeNodeId) return
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  topologyWS = new WebSocket(
-    `${protocol}//${window.location.host}/api/topology/ws?node_id=${encodeURIComponent(store.activeNodeId)}&token=${encodeURIComponent(token)}`
-  )
-  topologyWS.onmessage = (event) => {
-    const snapshot = JSON.parse(event.data) as TopologySnapshot
-    if (snapshot.node_id && snapshot.node_id !== store.activeNodeId) return
-    store.nodes = snapshot.nodes || []
-    if (snapshot.cluster) cluster.value = snapshot.cluster
+  () => store.topologySnapshot,
+  (snapshot) => {
+    if (!snapshot) return
+    cluster.value = snapshot.cluster
     spokes.value = sortSpokesByIP(snapshot.spokes || [])
     slaMatrix.value = snapshot.sla_matrix || []
     witnessQuorum.value = snapshot.witness_quorum || null
     loading.value = false
-  }
-  topologyWS.onclose = () => {
-    if (localStorage.getItem('opennhrp_token')) {
-      reconnectTimer = window.setTimeout(connectTopologyWS, 3000)
-    }
-  }
-}
-
-onMounted(async () => {
-  await refreshData()
-  connectTopologyWS()
-})
-
-onUnmounted(() => {
-  closeTopologyWS()
-})
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

@@ -43,18 +43,26 @@ type AgentTelemetry struct {
 	Witness          protocol.WitnessPayload
 }
 
+type haStatusCache struct {
+	replication *executor.ReplicationStatusInfo
+	invites     []executor.InviteRecord
+	keyStatus   *executor.KeyStatusInfo
+}
+
 type NodeManager struct {
 	database       *db.DB
 	agents         map[string]*executor.AgentExecutor
 	telemetry      map[string]AgentTelemetry
 	witnessEnabled bool
 	// ponytail: last-known views are process-local; persist only if restart recovery is required.
-	clusters     map[string]executor.ClusterStatusInfo
-	spokes       map[string][]executor.SpokeInfo
-	lastPersist  map[string]time.Time
-	topologySubs map[chan struct{}]struct{}
-	mu           sync.RWMutex
-	logHub       *LogHub
+	clusters      map[string]executor.ClusterStatusInfo
+	spokes        map[string][]executor.SpokeInfo
+	haStatus      map[string]haStatusCache
+	haSubscribers int
+	lastPersist   map[string]time.Time
+	topologySubs  map[chan struct{}]struct{}
+	mu            sync.RWMutex
+	logHub        *LogHub
 }
 
 func NewNodeManager(cfg *config.Config, database *db.DB, logHub *LogHub) *NodeManager {
@@ -64,6 +72,7 @@ func NewNodeManager(cfg *config.Config, database *db.DB, logHub *LogHub) *NodeMa
 		telemetry:    make(map[string]AgentTelemetry),
 		clusters:     make(map[string]executor.ClusterStatusInfo),
 		spokes:       make(map[string][]executor.SpokeInfo),
+		haStatus:     make(map[string]haStatusCache),
 		lastPersist:  make(map[string]time.Time),
 		topologySubs: make(map[chan struct{}]struct{}),
 		logHub:       logHub,
@@ -155,8 +164,39 @@ func (m *NodeManager) syncAgentMetadata(ctx context.Context) {
 			if exec.GetNodeType() != "hub" {
 				return
 			}
-			status, err := exec.GetClusterStatus(subCtx)
-			if err == nil && status != nil && status.Member != "" {
+
+			var (
+				status      *executor.ClusterStatusInfo
+				statusErr   error
+				replication *executor.ReplicationStatusInfo
+				invites     []executor.InviteRecord
+				keyStatus   *executor.KeyStatusInfo
+				workers     sync.WaitGroup
+			)
+			wantHA := m.wantsHAStatus()
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				status, statusErr = exec.GetClusterStatus(subCtx)
+			}()
+			if wantHA {
+				workers.Add(3)
+				go func() {
+					defer workers.Done()
+					replication, _ = exec.GetReplicationStatus(subCtx)
+				}()
+				go func() {
+					defer workers.Done()
+					invites, _ = exec.ListInvites(subCtx)
+				}()
+				go func() {
+					defer workers.Done()
+					keyStatus, _ = exec.GetKeyStatus(subCtx)
+				}()
+			}
+			workers.Wait()
+
+			if statusErr == nil && status != nil && status.Member != "" {
 				var advIP string
 				var prio int
 				for _, mb := range status.Members {
@@ -173,6 +213,11 @@ func (m *NodeManager) syncAgentMetadata(ctx context.Context) {
 					status.Member, status.LocalRole, status.Term, prio, advIP, time.Now(), id,
 				)
 			}
+			m.CacheClusterStatus(id, status)
+			if wantHA {
+				m.CacheHAStatus(id, replication, invites, keyStatus)
+			}
+			m.notifyTopology()
 		}(nodeID, agentExec)
 	}
 }
@@ -302,6 +347,17 @@ func (m *NodeManager) GetHubExecutor(nodeID string) (executor.NodeExecutor, erro
 		}
 	}
 	return nil, fmt.Errorf("no Hub opennhrp-agent connected to manager")
+}
+
+func (m *NodeManager) GetOpenNHRPExecutor(nodeID string) (executor.NodeExecutor, error) {
+	exec, err := m.GetExecutor(nodeID)
+	if err != nil {
+		return nil, err
+	}
+	if nodeType := exec.GetNodeType(); nodeType != "hub" && nodeType != "spoke" {
+		return nil, fmt.Errorf("node %s does not run OpenNHRP", exec.GetNodeID())
+	}
+	return exec, nil
 }
 
 func (m *NodeManager) RegisterAgent(nodeID, nodeType string, conn *websocket.Conn) *executor.AgentExecutor {
@@ -463,6 +519,25 @@ func (m *NodeManager) SubscribeTopology() (<-chan struct{}, func()) {
 	}
 }
 
+func (m *NodeManager) SubscribeHA() func() {
+	m.mu.Lock()
+	m.haSubscribers++
+	m.mu.Unlock()
+	return func() {
+		m.mu.Lock()
+		if m.haSubscribers > 0 {
+			m.haSubscribers--
+		}
+		m.mu.Unlock()
+	}
+}
+
+func (m *NodeManager) wantsHAStatus() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.haSubscribers > 0
+}
+
 func (m *NodeManager) notifyTopology() {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -472,6 +547,10 @@ func (m *NodeManager) notifyTopology() {
 		default:
 		}
 	}
+}
+
+func (m *NodeManager) NotifyTopology() {
+	m.notifyTopology()
 }
 
 func (m *NodeManager) GetNodeTelemetry(nodeID string) (AgentTelemetry, bool) {
@@ -506,6 +585,47 @@ func (m *NodeManager) GetCachedClusterStatus(nodeID string) (*executor.ClusterSt
 	return &snapshot, true
 }
 
+func (m *NodeManager) CacheHAStatus(nodeID string, replication *executor.ReplicationStatusInfo, invites []executor.InviteRecord, keyStatus *executor.KeyStatusInfo) {
+	if nodeID == "" {
+		return
+	}
+	m.mu.Lock()
+	cached := m.haStatus[nodeID]
+	if replication != nil {
+		snapshot := *replication
+		snapshot.Peers = append([]executor.ReplicationPeerInfo(nil), replication.Peers...)
+		cached.replication = &snapshot
+	}
+	if invites != nil {
+		cached.invites = append([]executor.InviteRecord(nil), invites...)
+	}
+	if keyStatus != nil {
+		snapshot := *keyStatus
+		cached.keyStatus = &snapshot
+	}
+	m.haStatus[nodeID] = cached
+	m.mu.Unlock()
+}
+
+func (m *NodeManager) GetCachedHAStatus(nodeID string) (*executor.ReplicationStatusInfo, []executor.InviteRecord, *executor.KeyStatusInfo) {
+	m.mu.RLock()
+	cached := m.haStatus[nodeID]
+	m.mu.RUnlock()
+
+	var replication *executor.ReplicationStatusInfo
+	if cached.replication != nil {
+		snapshot := *cached.replication
+		snapshot.Peers = append([]executor.ReplicationPeerInfo(nil), cached.replication.Peers...)
+		replication = &snapshot
+	}
+	var keyStatus *executor.KeyStatusInfo
+	if cached.keyStatus != nil {
+		snapshot := *cached.keyStatus
+		keyStatus = &snapshot
+	}
+	return replication, append([]executor.InviteRecord(nil), cached.invites...), keyStatus
+}
+
 func (m *NodeManager) CacheSpokes(nodeID, iface string, spokes []executor.SpokeInfo) {
 	if nodeID == "" {
 		return
@@ -538,6 +658,20 @@ func (m *NodeManager) GetCachedSpokes(nodeID, iface string) ([]executor.SpokeInf
 	spokes, ok := m.spokes[key]
 	m.mu.RUnlock()
 	return append([]executor.SpokeInfo{}, spokes...), ok
+}
+
+func (m *NodeManager) GetCachedSpokesByNode() map[string][]executor.SpokeInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make(map[string][]executor.SpokeInfo)
+	for key, spokes := range m.spokes {
+		nodeID, iface, ok := strings.Cut(key, "\x00")
+		if !ok || iface != "" {
+			continue
+		}
+		result[nodeID] = append([]executor.SpokeInfo{}, spokes...)
+	}
+	return result
 }
 
 func (m *NodeManager) ListAgentTelemetry() map[string]AgentTelemetry {
@@ -627,6 +761,7 @@ func (m *NodeManager) ListNodes(_ context.Context) ([]db.NodeRecord, error) {
 				n.NetworkHealth = tel.NetworkHealth
 				n.ServiceAvail = tel.ServiceAvail
 				n.ActiveSpokes = tel.ActiveSpokes
+				n.PeerCount = tel.PeerCount
 				n.WSRttMs = tel.WSRttMs
 			}
 		}

@@ -108,6 +108,21 @@ func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 	if observed[0].ManagedNodeID != "branch-1" || observed[0].ManagedStatus != "offline" {
 		t.Fatalf("Hub-observed Spoke was not linked to managed device: %#v", observed[0])
 	}
+	ctx, recorder = managedSpokeTestContext(http.MethodPatch, "/api/managed-spokes/branch-1", `{"name":"天翼云"}`)
+	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
+	handler.Update(ctx)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("managed Spoke name update failed: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if err := database.QueryRow(`SELECT name FROM nodes WHERE id='branch-1'`).Scan(&stored); err != nil || stored != "天翼云" {
+		t.Fatalf("managed Spoke name was not updated: name=%q err=%v", stored, err)
+	}
+	ctx, recorder = managedSpokeTestContext(http.MethodPatch, "/api/managed-spokes/branch-1", `{"name":" "}`)
+	ctx.Params = gin.Params{{Key: "id", Value: "branch-1"}}
+	handler.Update(ctx)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("blank managed Spoke name accepted: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
 	agentHandler := NewAgentWSHandler(&config.Config{AuthToken: "global"}, database, nodeMgr, service.NewLogHub())
 	if !agentHandler.authenticateAgent("branch-1", "spoke", created.Token) ||
 		agentHandler.authenticateAgent("branch-1", "spoke", "global") ||
@@ -159,5 +174,22 @@ func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 	handler.Delete(ctx)
 	if recorder.Code != http.StatusNoContent || agentHandler.authenticateAgent("branch-1", "spoke", created.Token) {
 		t.Fatalf("delete did not revoke enrollment: status=%d", recorder.Code)
+	}
+}
+
+func TestSpokeMetadataDecorationIncludesNotes(t *testing.T) {
+	database, err := db.InitDB(filepath.Join(t.TempDir(), "manager.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.Exec(`INSERT INTO spoke_metadata (protocol_address, alias, site_name, contact, notes, updated_at) VALUES (?, ?, '', '', ?, CURRENT_TIMESTAMP)`, "10.20.0.2/24", "设备", "备注"); err != nil {
+		t.Fatal(err)
+	}
+
+	spokes := []executor.SpokeInfo{{ProtocolAddress: "10.20.0.2/24"}}
+	NewSpokeHandler(nil, database).decorateSpokes(spokes)
+	if spokes[0].Alias != "设备" || spokes[0].Notes != "备注" {
+		t.Fatalf("metadata was not decorated: %#v", spokes[0])
 	}
 }
