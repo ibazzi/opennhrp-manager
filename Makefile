@@ -3,7 +3,6 @@
 GO ?= go
 GOOS ?= linux
 CGO_ENABLED ?= 0
-BINDIR ?= build
 LDFLAGS ?= -s -w
 
 all: build
@@ -27,20 +26,20 @@ build-frontend:
 # 生产二进制编译 (Go Cross-Compilation)
 # =======================================================
 build-server: build-frontend
-	mkdir -p $(BINDIR)
+	mkdir -p build
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) GOMIPS=$(GOMIPS) GOARM=$(GOARM) \
-		$(GO) build -ldflags="$(LDFLAGS)" -o $(BINDIR)/opennhrp-manager main.go
+		$(GO) build -ldflags="$(LDFLAGS)" -o build/opennhrp-manager main.go
 
 build: build-server
 
 install:
 	mkdir -p $(DESTDIR)/usr/sbin
-	@if [ -f "$(BINDIR)/opennhrp-manager" ]; then \
-		install -m 755 $(BINDIR)/opennhrp-manager $(DESTDIR)/usr/sbin/opennhrp-manager; \
+	@if [ -f "build/opennhrp-manager" ]; then \
+		install -m 755 build/opennhrp-manager $(DESTDIR)/usr/sbin/opennhrp-manager; \
 	fi
 
 clean:
-	rm -rf $(BINDIR) frontend/dist
+	rm -rf build frontend/dist
 
 # =======================================================
 # 开发与快速调试模式 (Development with Vite HMR)
