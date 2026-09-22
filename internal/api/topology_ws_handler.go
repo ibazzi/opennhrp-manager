@@ -21,6 +21,8 @@ type TopologyWSHandler struct {
 	spoke      *SpokeHandler
 }
 
+const topologySnapshotTimeout = 5 * time.Second
+
 type liveMessage struct {
 	Type     string             `json:"type"`
 	Topology *topologySnapshot  `json:"topology,omitempty"`
@@ -64,7 +66,7 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 	logs, unsubscribeLogs := h.logHub.Subscribe()
 	defer unsubscribeLogs()
 
-	if err := h.writeSnapshot(c.Request.Context(), conn, nodeID, includeHA); err != nil {
+	if err := h.writeSnapshotWithTimeout(conn, nodeID, includeHA); err != nil {
 		return
 	}
 	dirty := false
@@ -86,7 +88,7 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 		case <-flush.C:
 			if dirty {
 				dirty = false
-				if err := h.writeSnapshot(context.Background(), conn, nodeID, includeHA); err != nil {
+				if err := h.writeSnapshotWithTimeout(conn, nodeID, includeHA); err != nil {
 					return
 				}
 			}
@@ -96,6 +98,12 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 			}
 		}
 	}
+}
+
+func (h *TopologyWSHandler) writeSnapshotWithTimeout(conn *websocket.Conn, nodeID string, includeHA bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), topologySnapshotTimeout)
+	defer cancel()
+	return h.writeSnapshot(ctx, conn, nodeID, includeHA)
 }
 
 func (h *TopologyWSHandler) writeSnapshot(ctx context.Context, conn *websocket.Conn, nodeID string, includeHA bool) error {
@@ -114,7 +122,7 @@ func (h *TopologyWSHandler) writeSnapshot(ctx context.Context, conn *websocket.C
 	spokesByNode := h.nodeMgr.GetCachedSpokesByNode()
 	for id, spokes := range spokesByNode {
 		if h.spoke != nil {
-			h.spoke.decorateSpokes(spokes)
+			h.spoke.decorateSpokes(ctx, spokes)
 		}
 		spokesByNode[id] = spokes
 	}

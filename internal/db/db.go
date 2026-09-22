@@ -1,10 +1,12 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -110,13 +112,33 @@ type ConfigHistoryRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+const sqlitePoolSize = 8
+
+func sqliteDSN(dbPath string) string {
+	dsn := dbPath
+	if dbPath == ":memory:" {
+		dsn = fmt.Sprintf("file:opennhrp-manager-memory-%d?mode=memory&cache=shared", time.Now().UnixNano())
+	}
+
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+	dsn += separator + "_pragma=busy_timeout%3d5000"
+	if dbPath != ":memory:" {
+		dsn += "&_pragma=journal_mode%28WAL%29"
+	}
+	return dsn
+}
+
 func InitDB(dbPath string) (*DB, error) {
-	sqlDB, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}
 
-	sqlDB.SetMaxOpenConns(1) // SQLite single writer safety
+	sqlDB.SetMaxOpenConns(sqlitePoolSize)
+	sqlDB.SetMaxIdleConns(sqlitePoolSize)
 
 	database := &DB{DB: sqlDB}
 	if err := database.migrate(); err != nil {
@@ -370,6 +392,10 @@ func (d *DB) SaveWitnessProbe(p WitnessProbeRecord) error {
 }
 
 func (d *DB) GetProbes(targetNodeID, probeType string, hours, maxPoints int) ([]WitnessProbeRecord, error) {
+	return d.GetProbesContext(context.Background(), targetNodeID, probeType, hours, maxPoints)
+}
+
+func (d *DB) GetProbesContext(ctx context.Context, targetNodeID, probeType string, hours, maxPoints int) ([]WitnessProbeRecord, error) {
 	if hours <= 0 {
 		hours = 24
 	}
@@ -412,7 +438,7 @@ func (d *DB) GetProbes(targetNodeID, probeType string, hours, maxPoints int) ([]
 	ORDER BY samples.recorded_at ASC`
 	args = append(args, cutoff, bucketSeconds)
 
-	rows, err := d.Query(query, args...)
+	rows, err := d.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -437,10 +463,14 @@ func (d *DB) GetProbes(targetNodeID, probeType string, hours, maxPoints int) ([]
 }
 
 func (d *DB) GetRecentProbes(targetNodeID string, limit int) ([]WitnessProbeRecord, error) {
+	return d.GetRecentProbesContext(context.Background(), targetNodeID, limit)
+}
+
+func (d *DB) GetRecentProbesContext(ctx context.Context, targetNodeID string, limit int) ([]WitnessProbeRecord, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-	rows, err := d.Query(
+	rows, err := d.QueryContext(ctx,
 		`SELECT id, target_node_id, probe_type, target_ip, rtt_ms, loss_rate, success, detail, recorded_at
 		 FROM (
 			SELECT id, target_node_id, probe_type, target_ip, rtt_ms, loss_rate, success, detail, recorded_at,
@@ -583,8 +613,12 @@ func (d *DB) CreateUser(u *UserRecord) error {
 }
 
 func (d *DB) GetUserByUsername(username string) (*UserRecord, error) {
+	return d.GetUserByUsernameContext(context.Background(), username)
+}
+
+func (d *DB) GetUserByUsernameContext(ctx context.Context, username string) (*UserRecord, error) {
 	var u UserRecord
-	err := d.QueryRow(
+	err := d.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, role, created_at, updated_at
 		 FROM users WHERE username = ?`,
 		username,
@@ -596,8 +630,12 @@ func (d *DB) GetUserByUsername(username string) (*UserRecord, error) {
 }
 
 func (d *DB) GetUserByID(id string) (*UserRecord, error) {
+	return d.GetUserByIDContext(context.Background(), id)
+}
+
+func (d *DB) GetUserByIDContext(ctx context.Context, id string) (*UserRecord, error) {
 	var u UserRecord
-	err := d.QueryRow(
+	err := d.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, role, created_at, updated_at
 		 FROM users WHERE id = ?`,
 		id,

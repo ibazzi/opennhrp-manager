@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,7 +22,9 @@ func NewWitnessHandler(witnessSvc *service.WitnessService, database *db.DB) *Wit
 }
 
 func (h *WitnessHandler) GetSLAMatrix(c *gin.Context) {
-	matrix, err := h.witnessSvc.GetSLAMatrix(c.Request.Context())
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	matrix, err := h.witnessSvc.GetSLAMatrix(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -56,7 +60,9 @@ func (h *WitnessHandler) GetRecentProbes(c *gin.Context) {
 		return
 	}
 
-	probes, err := h.database.GetProbes(nodeID, probeType, hours, points)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	probes, err := h.database.GetProbesContext(ctx, nodeID, probeType, hours, points)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

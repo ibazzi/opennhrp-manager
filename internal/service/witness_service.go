@@ -1075,7 +1075,7 @@ func (w *WitnessService) GetSLAMatrix(ctx context.Context) ([]NodeSLASummary, er
 		if n.Role == "witness" || n.Type == "spoke" {
 			continue
 		}
-		probes, _ := w.database.GetRecentProbes(n.ID, 10)
+		probes, _ := w.database.GetRecentProbesContext(ctx, n.ID, 10)
 		telemetry, hasTel := w.nodeMgr.GetNodeTelemetry(n.ID)
 		agentHealthy := w.nodeMgr.IsAgentHealthy(n.ID)
 

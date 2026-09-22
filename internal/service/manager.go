@@ -719,8 +719,8 @@ func (m *NodeManager) SetAgentConnectedForTest(nodeID string, connected bool) {
 	}
 }
 
-func (m *NodeManager) ListNodes(_ context.Context) ([]db.NodeRecord, error) {
-	rows, err := m.database.Query("SELECT id, name, type, host, status, role, term, priority, advertised_ip, network_health, service_avail, active_spokes, ws_rtt_ms, probe_mode, last_seen, created_at, updated_at FROM nodes ORDER BY priority DESC, id ASC")
+func (m *NodeManager) ListNodes(ctx context.Context) ([]db.NodeRecord, error) {
+	rows, err := m.database.QueryContext(ctx, "SELECT id, name, type, host, status, role, term, priority, advertised_ip, network_health, service_avail, active_spokes, ws_rtt_ms, probe_mode, last_seen, created_at, updated_at FROM nodes ORDER BY priority DESC, id ASC")
 	if err != nil {
 		return nil, err
 	}

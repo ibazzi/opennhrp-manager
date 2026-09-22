@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -104,7 +105,7 @@ func TestManagedSpokeTokenLifecycleAndAuthentication(t *testing.T) {
 		t.Fatalf("token was not hashed: %q", stored)
 	}
 	observed := []executor.SpokeInfo{{ProtocolAddress: "10.20.0.2/24"}}
-	NewSpokeHandler(nodeMgr, database).attachManagedSpokes(observed)
+	NewSpokeHandler(nodeMgr, database).attachManagedSpokes(context.Background(), observed)
 	if observed[0].ManagedNodeID != "branch-1" || observed[0].ManagedStatus != "offline" {
 		t.Fatalf("Hub-observed Spoke was not linked to managed device: %#v", observed[0])
 	}
@@ -188,7 +189,7 @@ func TestSpokeMetadataDecorationIncludesNotes(t *testing.T) {
 	}
 
 	spokes := []executor.SpokeInfo{{ProtocolAddress: "10.20.0.2/24"}}
-	NewSpokeHandler(nil, database).decorateSpokes(spokes)
+	NewSpokeHandler(nil, database).decorateSpokes(context.Background(), spokes)
 	if spokes[0].Alias != "设备" || spokes[0].Notes != "备注" {
 		t.Fatalf("metadata was not decorated: %#v", spokes[0])
 	}

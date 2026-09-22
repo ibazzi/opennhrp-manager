@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -39,7 +40,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUserByUsername(req.Username)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	user, err := h.db.GetUserByUsernameContext(ctx, req.Username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
@@ -74,7 +77,9 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	}
 	claims := claimsVal.(*auth.Claims)
 
-	user, err := h.db.GetUserByID(claims.UserID)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	user, err := h.db.GetUserByIDContext(ctx, claims.UserID)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"id":       claims.UserID,

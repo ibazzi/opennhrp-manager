@@ -29,8 +29,8 @@ func NewSpokeHandler(nodeMgr *service.NodeManager, database *db.DB) *SpokeHandle
 	}
 }
 
-func (h *SpokeHandler) attachManagedSpokes(spokes []executor.SpokeInfo) {
-	rows, err := h.database.Query(`SELECT id, name, status, advertised_ip FROM nodes WHERE type='spoke' AND advertised_ip<>''`)
+func (h *SpokeHandler) attachManagedSpokes(ctx context.Context, spokes []executor.SpokeInfo) {
+	rows, err := h.database.QueryContext(ctx, `SELECT id, name, status, advertised_ip FROM nodes WHERE type='spoke' AND advertised_ip<>''`)
 	if err != nil {
 		return
 	}
@@ -69,7 +69,7 @@ func (h *SpokeHandler) ListSpokes(c *gin.Context) {
 func (h *SpokeHandler) listSpokes(ctx context.Context, nodeID, iface string) ([]executor.SpokeInfo, error) {
 	exec, err := h.nodeMgr.GetHubExecutor(nodeID)
 	if err != nil {
-		if spokes, ok := h.cachedSpokes(nodeID, iface); ok {
+		if spokes, ok := h.cachedSpokes(ctx, nodeID, iface); ok {
 			return spokes, nil
 		}
 		return nil, err
@@ -77,13 +77,13 @@ func (h *SpokeHandler) listSpokes(ctx context.Context, nodeID, iface string) ([]
 
 	spokes, err := exec.ListSpokes(ctx, iface)
 	if err != nil {
-		if cached, ok := h.cachedSpokes(exec.GetNodeID(), iface); ok {
+		if cached, ok := h.cachedSpokes(ctx, exec.GetNodeID(), iface); ok {
 			return cached, nil
 		}
 		return nil, err
 	}
 
-	h.decorateSpokes(spokes)
+	h.decorateSpokes(ctx, spokes)
 	h.nodeMgr.CacheSpokes(exec.GetNodeID(), iface, spokes)
 	if nodeID != "" && nodeID != exec.GetNodeID() {
 		h.nodeMgr.CacheSpokes(nodeID, iface, spokes)
@@ -91,8 +91,8 @@ func (h *SpokeHandler) listSpokes(ctx context.Context, nodeID, iface string) ([]
 	return spokes, nil
 }
 
-func (h *SpokeHandler) decorateSpokes(spokes []executor.SpokeInfo) {
-	rows, _ := h.database.Query("SELECT protocol_address, alias, site_name, notes FROM spoke_metadata")
+func (h *SpokeHandler) decorateSpokes(ctx context.Context, spokes []executor.SpokeInfo) {
+	rows, _ := h.database.QueryContext(ctx, "SELECT protocol_address, alias, site_name, notes FROM spoke_metadata")
 	if rows != nil {
 		metaMap := make(map[string]struct{ Alias, Site, Notes string })
 		for rows.Next() {
@@ -118,10 +118,10 @@ func (h *SpokeHandler) decorateSpokes(spokes []executor.SpokeInfo) {
 		}
 		return spokes[i].ProtocolAddress < spokes[j].ProtocolAddress
 	})
-	h.attachManagedSpokes(spokes)
+	h.attachManagedSpokes(ctx, spokes)
 }
 
-func (h *SpokeHandler) cachedSpokes(nodeID, iface string) ([]executor.SpokeInfo, bool) {
+func (h *SpokeHandler) cachedSpokes(ctx context.Context, nodeID, iface string) ([]executor.SpokeInfo, bool) {
 	spokes, ok := h.nodeMgr.GetCachedSpokes(nodeID, iface)
 	if !ok {
 		return nil, false
@@ -129,7 +129,7 @@ func (h *SpokeHandler) cachedSpokes(nodeID, iface string) ([]executor.SpokeInfo,
 	for i := range spokes {
 		spokes[i].Stale = true
 	}
-	h.decorateSpokes(spokes)
+	h.decorateSpokes(ctx, spokes)
 	return spokes, true
 }
 

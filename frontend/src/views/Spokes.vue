@@ -54,10 +54,40 @@
 
         <n-card v-if="haStatus" size="small" title="Spoke HA Hub 路径与质量" class="mb-4">
           <div class="ha-summary"><span>接口: <code>{{ haStatus.interface }}</code></span><span>当前 Hub: <code>{{ haStatus.active_member || '-' }}</code></span><span>选择模式: <n-tag size="small" :type="haStatus.selection_mode === 'manual' ? 'warning' : 'info'">{{ haStatus.selection_mode === 'manual' ? (haStatus.manual_suspended ? '手动（HA 接管中）' : '手动') : '自动' }}</n-tag></span><span v-if="haStatus.selection_mode === 'manual'">手动目标: <code>{{ haStatus.manual_member }}</code></span><span>协调器: {{ haStatus.coordinator_state }}</span><span>切换: {{ haStatus.switching ? '进行中' : '稳定' }}</span><n-popconfirm v-if="haStatus.selection_mode === 'manual'" :disabled="!store.isAdmin || !!modeChanging" @positive-click="setHAMode('auto')"><template #trigger><n-button size="tiny" secondary :loading="modeChanging === 'auto'" :disabled="!store.isAdmin || !!modeChanging">恢复自动</n-button></template>清除手动目标并恢复自动评分切换策略？</n-popconfirm></div>
-          <p>失败率统计最近 30 秒内已完成的探测，包含超时和无效回复。评分 RTT 独立平滑；SRTT 用于超时估计。</p>
-          <n-table size="small" :bordered="false"><thead><tr><th style="width: 150px">Hub</th><th style="width: 100px">状态</th><th style="width: 150px">Selected endpoint</th><th style="width: 150px">评分 RTT</th><th style="width: 120px">探测失败率</th><th style="width: 180px">有效总分</th><th>Term / Leader</th><th style="width: 130px">操作</th></tr></thead><tbody>
+          <p>失败率统计最近 60 秒内已完成的探测，包含超时和无效回复。评分 RTT 独立平滑；SRTT 用于超时估计。</p>
+          <n-table size="small" :bordered="false"><thead><tr><th style="width: 150px">Hub</th><th style="width: 100px">状态</th><th style="width: 150px">Selected endpoint</th><th style="width: 150px">评分 RTT</th><th style="width: 170px">探测失败率</th><th style="width: 180px">有效总分</th><th>Term / Leader</th><th style="width: 130px">操作</th></tr></thead><tbody>
             <tr v-if="haStatus.candidates.length === 0"><td colspan="8" class="empty">暂无 Hub 候选</td></tr>
-            <tr v-for="candidate in haStatus.candidates" :key="candidate.member"><td><strong>{{ candidate.member }}</strong> <n-tag v-if="candidate.active" size="tiny" type="success">当前</n-tag> <n-tag v-if="haStatus.manual_member === candidate.member" size="tiny" type="warning">手动目标</n-tag></td><td><n-tag size="small" :type="candidate.ready ? 'success' : candidate.state === 'suspect' ? 'warning' : 'default'">{{ candidate.state }}</n-tag></td><td><code>{{ candidate.selected_address || '-' }}</code></td><td><div>{{ candidate.quality_rtt_ms == null ? '—' : candidate.quality_rtt_ms.toFixed(1) + ' ms' }}</div><small>超时估计 SRTT：{{ candidate.srtt_ms.toFixed(1) }} ms</small><br><small>有效回复距今：{{ candidate.last_quality_reply_age_ms == null ? '—' : (candidate.last_quality_reply_age_ms / 1000).toFixed(1) + ' s' }}</small></td><td><div>{{ candidate.quality_samples > 0 ? candidate.loss_pct.toFixed(1) + '%' : '—' }}</div><small>30 秒：{{ candidate.quality_failures ?? 0 }} / {{ candidate.quality_samples ?? 0 }} 次失败</small></td><td><n-tag size="small" :type="candidate.active ? 'success' : 'info'">{{ candidate.score }}</n-tag> <n-tag v-if="!candidate.quality_valid" size="tiny" type="warning">测量不足或已过期</n-tag><div><small>失败率 / 延时 / 优先级：{{ candidate.loss_score?.toFixed(2) ?? '—' }} / {{ candidate.latency_score?.toFixed(2) ?? '—' }} / {{ candidate.priority_score?.toFixed(2) ?? '—' }}</small></div></td><td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td><td><span v-if="candidate.active || haStatus.manual_member === candidate.member">-</span><n-popconfirm v-else :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated" @positive-click="setHAMode('manual', candidate.member)"><template #trigger><n-button size="tiny" secondary type="warning" :loading="modeChanging === candidate.member" :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated">设为手动目标</n-button></template>将当前 Spoke 手动切换到 {{ candidate.member }}？</n-popconfirm></td></tr>
+            <tr v-for="candidate in haStatus.candidates" :key="candidate.member">
+              <td><strong>{{ candidate.member }}</strong> <n-tag v-if="candidate.active" size="tiny" type="success">当前</n-tag> <n-tag v-if="haStatus.manual_member === candidate.member" size="tiny" type="warning">手动目标</n-tag></td>
+              <td>
+                <n-tag size="small" :type="candidate.ready ? 'success' : candidate.state === 'suspect' ? 'warning' : 'default'">{{ candidate.state }}</n-tag>
+              </td>
+              <td><code>{{ candidate.selected_address || '-' }}</code></td>
+              <td>
+                <div class="ha-metric-value">{{ candidate.quality_rtt_ms == null ? '—' : candidate.quality_rtt_ms.toFixed(1) + ' ms' }}</div>
+                <div class="ha-metric-details">
+                  <span><i>超时估计</i><b>{{ candidate.srtt_ms.toFixed(1) }} ms</b></span>
+                  <span><i>最近回复</i><b>{{ candidate.last_quality_reply_age_ms == null ? '—' : (candidate.last_quality_reply_age_ms / 1000).toFixed(1) + ' s' }}</b></span>
+                </div>
+              </td>
+              <td>
+                <div class="ha-metric-value">{{ candidate.quality_samples > 0 ? candidate.loss_pct.toFixed(1) + '%' : '—' }}</div>
+                <div class="ha-metric-details"><span><i>60 秒内</i><b>{{ candidate.quality_failures ?? 0 }} / {{ candidate.quality_samples ?? 0 }} 次失败</b></span></div>
+              </td>
+              <td>
+                <div class="ha-score-value">
+                  <n-tag size="small" :type="candidate.active ? 'success' : 'info'">{{ candidate.score }}</n-tag>
+                  <n-tag v-if="!candidate.quality_valid" size="tiny" type="warning">测量不足或已过期</n-tag>
+                </div>
+                <div class="ha-score-breakdown">
+                  <span><i>失败率</i><b>{{ candidate.loss_score?.toFixed(2) ?? '—' }}</b></span>
+                  <span><i>延时</i><b>{{ candidate.latency_score?.toFixed(2) ?? '—' }}</b></span>
+                  <span><i>优先级</i><b>{{ candidate.priority_score?.toFixed(2) ?? '—' }}</b></span>
+                </div>
+              </td>
+              <td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td>
+              <td><span v-if="candidate.active || haStatus.manual_member === candidate.member">-</span><n-popconfirm v-else :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated" @positive-click="setHAMode('manual', candidate.member)"><template #trigger><n-button size="tiny" secondary type="warning" :loading="modeChanging === candidate.member" :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated">设为手动目标</n-button></template>将当前 Spoke 手动切换到 {{ candidate.member }}？</n-popconfirm></td>
+            </tr>
           </tbody></n-table>
         </n-card>
 
@@ -221,6 +251,14 @@ tbody tr.manageable { cursor: pointer; }
 tbody tr.manageable:hover { background: var(--bg-card-secondary); }
 .peer-summary-card { height: 100%; }
 .ha-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; color: var(--text-muted); }
+.ha-metric-value { font-size: 15px; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.ha-metric-details { display: grid; gap: 4px; margin-top: 6px; color: var(--text-muted); font-size: 12px; line-height: 1.35; }
+.ha-metric-details span { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; }
+.ha-metric-details i, .ha-score-breakdown i { font-style: normal; color: var(--text-muted); }
+.ha-metric-details b, .ha-score-breakdown b { min-width: 0; color: var(--text-body); font-weight: 500; font-variant-numeric: tabular-nums; }
+.ha-score-value { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ha-score-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; color: var(--text-muted); font-size: 12px; line-height: 1.35; }
+.ha-score-breakdown span { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 :global(.manage-modal) { width: min(1400px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
 :global(.manage-modal table) { width: 100%; table-layout: fixed; }
 :global(.manage-modal th), :global(.manage-modal td) { overflow-wrap: anywhere; }

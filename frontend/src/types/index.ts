@@ -152,7 +152,7 @@ export interface HACandidate {
   leader?: string
   srtt_ms: number
   rto_ms: number
-  loss_pct: number // 30 秒窗口内已完成探测的失败率，含超时和无效回复
+  loss_pct: number // 60 秒窗口内已完成探测的失败率，含超时和无效回复
   quality_rtt_ms: number | null
   quality_samples: number
   quality_failures: number
