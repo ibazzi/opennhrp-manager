@@ -1,0 +1,11 @@
+tar-ignore=.git
+tar-ignore=frontend/node_modules
+tar-ignore=frontend/dist
+tar-ignore=build
+tar-ignore=*.db
+tar-ignore=*.db-*
+tar-ignore=debian/.debhelper
+tar-ignore=debian/opennhrp-manager
+tar-ignore=debian/debhelper-build-stamp
+tar-ignore=debian/files
+tar-ignore=debian/*.substvars

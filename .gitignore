@@ -5,3 +5,10 @@
 *.keys
 *.log
 /build
+/debian/.debhelper/
+/debian/opennhrp-manager/
+/debian/debhelper-build-stamp
+/debian/files
+/debian/*.debhelper*
+/debian/*.substvars
+/deploy/Caddyfile

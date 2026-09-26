@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cd frontend && CI=true corepack pnpm install --frozen-lockfile
+	cd frontend && corepack pnpm build
+	mkdir -p build
+	CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o build/opennhrp-manager .
+
+override_dh_auto_test:
+	go test ./...
+
+override_dh_auto_clean:
+
+override_dh_installsystemd:
+	dh_installsystemd --no-start

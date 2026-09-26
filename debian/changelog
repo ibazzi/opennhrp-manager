@@ -1,0 +1,18 @@
+opennhrp-manager (1.0.2) unstable; urgency=medium
+
+  * Preserve the WebSocket client IP through trusted reverse proxies so
+    Witness probes target the connected Hub instead of Manager loopback.
+
+ -- ibazzi <ibazzi@qq.com>  Sat, 26 Sep 2026 11:43:54 +0800
+
+opennhrp-manager (1.0.1) unstable; urgency=medium
+
+  * Keep empty witness quorum members as an array and handle legacy null values.
+
+ -- ibazzi <ibazzi@qq.com>  Thu, 24 Sep 2026 23:29:30 +0800
+
+opennhrp-manager (1.0.0) unstable; urgency=medium
+
+  * Package the manager as a Debian systemd service.
+
+ -- ibazzi <ibazzi@qq.com>  Thu, 24 Sep 2026 22:30:00 +0800

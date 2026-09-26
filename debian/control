@@ -1,0 +1,14 @@
+Source: opennhrp-manager
+Section: net
+Priority: optional
+Maintainer: ibazzi <ibazzi@qq.com>
+Build-Depends: debhelper-compat (= 13), golang-go (>= 2:1.22), nodejs (>= 20)
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: opennhrp-manager
+Architecture: any
+Depends: ${misc:Depends}
+Description: OpenNHRP web manager and witness service
+ Provides a web console, Agent WebSocket endpoint, and witness service for
+ OpenNHRP deployments.
