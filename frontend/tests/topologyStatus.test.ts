@@ -7,8 +7,10 @@ import {
   findLatestLeaderNode,
   formatHubStatus,
   formatWitnessStatus,
+  formatWitnessQuorumStatus,
   isHubNode,
   isNodeSelectable,
+  isWitnessQuorumHealthy,
   selectActiveNode,
   splitBalanced,
   type HubStatusContext,
@@ -79,6 +81,9 @@ const disabled = member('hub-backup1')
 disabled.state = 'disabled'
 assert.equal(classifyHubStatus(disabled, node('hub-backup1', 'offline'), undefined, context('hub-primary')).state, 'disabled')
 assert.equal(formatWitnessStatus({ mode: 'legacy', policy: 'hub-majority', quorum_available: true, required: 2 } as any, 3), 'Hub majority · 3 online · 需 2')
+const emptyQuorum = { mode: 'active', policy: 'hub-majority', required: 2, members: null } as any
+assert.equal(isWitnessQuorumHealthy(emptyQuorum), false)
+assert.match(formatWitnessQuorumStatus(emptyQuorum), /0 online/)
 assert.equal(isHubNode(node('hub-primary')), true)
 assert.equal(isHubNode({ ...node('branch-1'), type: 'spoke', role: 'spoke' }), false)
 assert.deepEqual(splitBalanced(['H2', 'H3']), [['H2'], ['H3']])

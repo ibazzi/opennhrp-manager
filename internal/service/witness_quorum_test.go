@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +13,17 @@ import (
 	"opennhrp-manager/internal/executor"
 	"opennhrp-manager/internal/protocol"
 )
+
+func TestEmptyWitnessQuorumMembersSerializeAsArray(t *testing.T) {
+	status := NewWitnessService(&config.Config{}, nil, nil).GetQuorumStatus()
+	data, err := json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"members":[]`) {
+		t.Fatalf("empty quorum members must be an array: %s", data)
+	}
+}
 
 func testWitnessHub(nodeID, member, primary, leader, mode, epoch string,
 	term, index uint64, digest string, now time.Time) witnessHub {

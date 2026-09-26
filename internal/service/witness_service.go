@@ -953,7 +953,8 @@ func (w *WitnessService) runQuorumCycle(ctx context.Context, now time.Time) {
 
 func (w *WitnessService) GetQuorumStatus() WitnessQuorumStatus {
 	status := WitnessQuorumStatus{Mode: "legacy", Policy: "legacy",
-		Transition: "legacy", DecisionReason: "Witness has not been activated"}
+		Transition: "legacy", DecisionReason: "Witness has not been activated",
+		Members: []WitnessQuorumMember{}}
 	if w.nodeMgr == nil {
 		return status
 	}

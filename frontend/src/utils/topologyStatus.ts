@@ -218,13 +218,13 @@ export function formatWitnessStatus(witness: WitnessStatus | undefined, onlineHu
 export function isWitnessQuorumHealthy(quorum: WitnessQuorumStatus | null | undefined): boolean {
   if (!quorum) return false
   if (quorum.policy !== 'hub-majority' && quorum.mode === 'legacy') return true
-  return quorum.members.some((member) => member.fresh && member.quorum_available && !member.fenced)
+  return quorum.members?.some((member) => member.fresh && member.quorum_available && !member.fenced) ?? false
 }
 
 export function formatWitnessQuorumStatus(quorum: WitnessQuorumStatus | null | undefined): string {
   if (!quorum) return '全局仲裁状态未知'
   if (quorum.policy === 'hub-majority') {
-    const onlineHubs = quorum.members.filter((member) => member.agent_connected && member.fresh).length
+    const onlineHubs = quorum.members?.filter((member) => member.agent_connected && member.fresh).length ?? 0
     const state = isWitnessQuorumHealthy(quorum) ? 'Hub majority' : witnessProblem(quorum)
     return `${state} · ${onlineHubs} online · 需 ${quorum.required}`
   }
