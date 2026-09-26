@@ -7,6 +7,19 @@ import (
 	"opennhrp-manager/internal/db"
 )
 
+func TestProbeHostUsesWebSocketSource(t *testing.T) {
+	w := &WitnessService{}
+	for _, tc := range []struct{ host, advertised, want string }{
+		{"10.0.0.3", "114.28.143.35", "10.0.0.3"},
+		{"10.0.0.3:39648", "114.28.143.35", "10.0.0.3"},
+		{"[2001:db8::3]:39648", "114.28.143.35", "2001:db8::3"},
+	} {
+		if got := w.probeHost(db.NodeRecord{Host: tc.host, AdvertisedIP: tc.advertised}); got != tc.want {
+			t.Errorf("source %q: target %q, want %q", tc.host, got, tc.want)
+		}
+	}
+}
+
 func TestWSHistoryDoesNotMaskInboundFailures(t *testing.T) {
 	probes := []db.WitnessProbeRecord{
 		{ProbeType: "agent_telemetry", Success: true},

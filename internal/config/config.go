@@ -9,6 +9,7 @@ import (
 type Config struct {
 	ServerPort      string
 	BindHost        string
+	TrustedProxies  string // comma-separated proxy IPs or CIDRs; loopback is always trusted
 	DatabasePath    string
 	AuthToken       string
 	JWTSecret       string
@@ -21,6 +22,7 @@ func LoadConfig() *Config {
 	cfg := &Config{
 		ServerPort:      getEnv("PORT", "8080"),
 		BindHost:        getEnv("BIND_HOST", "0.0.0.0"),
+		TrustedProxies:  getEnv("TRUSTED_PROXIES", ""),
 		DatabasePath:    getEnv("DB_PATH", "/etc/opennhrp-manager/database.db"),
 		AuthToken:       authToken,
 		JWTSecret:       getEnv("JWT_SECRET", authToken),

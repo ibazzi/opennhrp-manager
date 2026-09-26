@@ -360,7 +360,7 @@ func (m *NodeManager) GetOpenNHRPExecutor(nodeID string) (executor.NodeExecutor,
 	return exec, nil
 }
 
-func (m *NodeManager) RegisterAgent(nodeID, nodeType string, conn *websocket.Conn) *executor.AgentExecutor {
+func (m *NodeManager) RegisterAgent(nodeID, nodeType, host string, conn *websocket.Conn) *executor.AgentExecutor {
 	agentExec := executor.NewAgentExecutor(nodeID, nodeType, conn)
 	m.mu.Lock()
 	previous := m.agents[nodeID]
@@ -375,8 +375,8 @@ func (m *NodeManager) RegisterAgent(nodeID, nodeType string, conn *websocket.Con
 		`INSERT INTO nodes (id, name, type, host, status, updated_at)
 		 VALUES (?, ?, ?, ?, 'online', ?)
 		 ON CONFLICT(id) DO UPDATE SET type=?, status='online', host=?, updated_at=?`,
-		nodeID, nodeID, nodeType, conn.RemoteAddr().String(), time.Now(),
-		nodeType, conn.RemoteAddr().String(), time.Now(),
+		nodeID, nodeID, nodeType, host, time.Now(),
+		nodeType, host, time.Now(),
 	)
 	m.notifyTopology()
 

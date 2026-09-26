@@ -71,10 +71,10 @@ func (h *AgentWSHandler) HandleWS(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	agentExec := h.nodeMgr.RegisterAgent(nodeID, nodeType, conn)
+	agentExec := h.nodeMgr.RegisterAgent(nodeID, nodeType, c.ClientIP(), conn)
 	defer h.nodeMgr.UnregisterAgent(nodeID, agentExec)
 
-	log.Printf("[AgentWS] Agent connected: %s from %s", nodeID, conn.RemoteAddr())
+	log.Printf("[AgentWS] Agent connected: %s from %s", nodeID, c.ClientIP())
 
 	// Ping and Pong state is owned by this connection's read loop.
 	var latency agentWSLatency

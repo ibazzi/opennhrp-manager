@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,6 +21,10 @@ func SetupRouter(
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	proxies := append([]string{"127.0.0.1", "::1"}, strings.Fields(strings.ReplaceAll(cfg.TrustedProxies, ",", " "))...)
+	if err := r.SetTrustedProxies(proxies); err != nil {
+		panic(fmt.Errorf("invalid TRUSTED_PROXIES: %w", err))
+	}
 	r.Use(gin.Recovery())
 
 	// Enable CORS for local Vite dev server

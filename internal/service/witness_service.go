@@ -175,7 +175,7 @@ func (w *WitnessService) runProbeCycle(ctx context.Context) {
 		}
 
 		// 1. Probe L4 Port 49002 if host is available
-		host := w.probeHost(ctx, n)
+		host := w.probeHost(n)
 
 		// L4 HA Port 49002 probe
 		l4Addr := net.JoinHostPort(host, "49002")
@@ -268,29 +268,10 @@ func probeSource(probe db.WitnessProbeRecord) string {
 	return "direct"
 }
 
-func (w *WitnessService) probeHost(ctx context.Context, node db.NodeRecord) string {
+func (w *WitnessService) probeHost(node db.NodeRecord) string {
 	host := node.Host
 	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
 		host = parsedHost
-	}
-	exec, err := w.nodeMgr.GetHubExecutor(node.ID)
-	if err != nil {
-		return host
-	}
-	status, err := exec.GetClusterStatus(ctx)
-	if err != nil {
-		return host
-	}
-	for _, member := range status.Members {
-		if member.MemberID != status.Member {
-			continue
-		}
-		for _, address := range member.Advertised {
-			ip := net.ParseIP(address)
-			if ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
-				return address
-			}
-		}
 	}
 	return host
 }
