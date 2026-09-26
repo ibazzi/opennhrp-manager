@@ -210,7 +210,7 @@
               <th style="width: 80px;">Term</th>
               <th style="width: 180px;">相关 Hub</th>
               <th style="width: 120px;">仲裁决策</th>
-              <th class="allow-wrap">判定依据与推理</th>
+              <th style="min-width: 220px;">判定依据与推理</th>
             </tr>
           </thead>
           <tbody>

@@ -95,7 +95,7 @@
                 </n-layout-header>
 
                 <n-layout-content class="app-content" :native-scrollbar="false">
-                  <n-scrollbar style="max-height: calc(100vh - 56px);">
+                  <n-scrollbar class="app-scrollbar" style="max-height: calc(100dvh - 56px);">
                     <router-view />
                   </n-scrollbar>
                 </n-layout-content>
@@ -506,9 +506,9 @@ code {
   vertical-align: 0 !important;
 }
 
-/* Fixed table layout with wrapping content and sticky headers. */
+/* Keep table headings readable; wide tables scroll inside their containers. */
 .n-table {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
   border: none !important;
   overflow: visible;
@@ -531,8 +531,8 @@ code {
   border-right: none !important;
   border-left: none !important;
   border-bottom: 1px solid var(--border-color) !important;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
   box-shadow: 0 1px 0 var(--border-color) !important;
 }
 
@@ -544,10 +544,11 @@ code {
   overflow-wrap: anywhere;
 }
 
-.n-table td.allow-wrap,
-.n-table th.allow-wrap {
+.n-table td.allow-wrap {
   white-space: normal;
 }
+
+.n-card-content:has(> .n-table) { overflow-x: auto; }
 
 .n-data-table {
   border: none !important;
@@ -559,8 +560,8 @@ code {
   border-right: none !important;
   border-left: none !important;
   border-bottom: 1px solid var(--border-color) !important;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
   box-shadow: 0 1px 0 var(--border-color) !important;
 }
 
@@ -576,6 +577,7 @@ code {
 <style scoped>
 .app-layout {
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -691,6 +693,7 @@ code {
   background: var(--bg-content);
   overflow: hidden;
   height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
   transition: background-color 0.2s ease;
 }
 

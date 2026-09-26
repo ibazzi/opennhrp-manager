@@ -310,6 +310,16 @@ onMounted(() => {
   flex-direction: column;
 }
 
+.editor-card :deep(.n-card-header) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.editor-card :deep(.n-card-header__extra) {
+  margin-left: 0;
+}
+
 .editor-card :deep(.n-card-content) {
   display: flex;
   flex: 1 1 auto;
@@ -348,6 +358,17 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .page-container {
+    height: auto;
+    overflow: visible;
+  }
+  .editor-card,
+  .editor-wrapper {
+    flex: none;
+  }
+  .editor-wrapper {
+    height: 360px;
+  }
   .page-header {
     flex-direction: column;
     align-items: stretch !important;

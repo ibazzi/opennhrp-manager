@@ -236,6 +236,14 @@ const handleLogin = async () => {
 }
 
 @media (max-width: 768px) {
+  .login-wrapper {
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .login-card-container {
+    margin: auto 0;
+  }
   .login-card {
     padding: 24px 18px;
   }

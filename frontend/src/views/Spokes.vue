@@ -6,13 +6,13 @@
     </div>
     <n-alert v-if="loadFailures.length" type="warning" class="mb-4">以下 Hub 暂时无法读取，其他数据仍正常显示：{{ loadFailures.join('、') }}</n-alert>
     <n-card size="small" class="search-card mb-4">
-      <n-space justify="space-between" align="center" :wrap="true">
-        <n-space align="center" :wrap="true">
+      <div class="search-bar">
+        <div class="search-controls">
           <n-input v-model:value="searchText" placeholder="搜索 Hub / Spoke / IP / 别名..." clearable style="width: 300px" />
           <n-select v-model:value="selectedType" :options="typeOptions" style="width: 180px" />
-        </n-space>
+        </div>
         <span class="text-muted">共 <strong class="text-emerald">{{ filteredRows.length }}</strong> 条，覆盖 {{ hubCount }} 个 Hub</span>
-      </n-space>
+      </div>
     </n-card>
 
     <n-card class="table-card">
@@ -242,6 +242,8 @@ onBeforeUnmount(stopHARefresh)
 .empty { text-align: center; padding: 18px; }
 .mb-4 { margin-bottom: 16px; }
 .search-card { background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: var(--card-shadow); }
+.search-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.search-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .spoke-panel { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
 .table-card { flex: 1; min-height: 0; overflow: hidden; }
 .table-card :deep(.n-card-content) { box-sizing: border-box; height: 100%; min-height: 0; }
@@ -260,7 +262,7 @@ tbody tr.manageable:hover { background: var(--bg-card-secondary); }
 .ha-score-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; color: var(--text-muted); font-size: 12px; line-height: 1.35; }
 .ha-score-breakdown span { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 :global(.manage-modal) { width: min(1400px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
-:global(.manage-modal table) { width: 100%; table-layout: fixed; }
+:global(.manage-modal table) { width: 100%; table-layout: auto; }
 :global(.manage-modal th), :global(.manage-modal td) { overflow-wrap: anywhere; }
-@media (max-width: 768px) { .page-header { align-items: stretch; flex-direction: column; } .page-header .n-button { width: 100%; } :global(.manage-modal) { width: calc(100vw - 16px); max-height: calc(100vh - 16px); } :global(.manage-modal th) { width: auto !important; } :global(.manage-modal table .n-button) { box-sizing: border-box; height: auto; max-width: 100%; padding: 0 4px; white-space: normal; } }
+@media (max-width: 768px) { .spoke-panel, .table-card { flex: none; overflow: visible; } .table-card :deep(.n-card-content), .table-scroll { height: auto !important; } .page-header { align-items: stretch; flex-direction: column; } .page-header .n-button { width: 100%; } .search-controls { width: 100%; flex-direction: column; align-items: stretch; } .search-controls :deep(.n-input), .search-controls :deep(.n-select) { width: 100% !important; } :global(.manage-modal) { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); } :global(.manage-modal table) { width: max-content; min-width: 100%; table-layout: auto; } :global(.manage-modal th) { width: auto !important; } :global(.manage-modal table .n-button) { box-sizing: border-box; height: auto; max-width: 100%; padding: 0 4px; white-space: normal; } }
 </style>

@@ -148,6 +148,20 @@ onMounted(loadLogs)
 }
 
 @media (max-width: 768px) {
+  .page-container {
+    height: auto;
+    overflow: visible;
+  }
+
+  .audit-card {
+    flex: none;
+  }
+
+  .audit-table-scroll {
+    flex: none;
+    max-height: 60dvh;
+  }
+
   .page-header {
     align-items: stretch;
     flex-direction: column;
