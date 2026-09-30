@@ -17,15 +17,15 @@
 
     <n-card class="table-card">
       <n-scrollbar x-scrollable class="table-scroll" style="height: 100%; max-height: none">
-        <n-table :bordered="false" :single-line="true" style="min-width: 1320px">
+        <n-table :bordered="false" :single-line="true" style="min-width: 1320px; table-layout: fixed">
           <thead><tr><th style="width: 120px">Protocol IP</th><th style="width: 110px">所属 Hub</th><th>Spoke / 备注</th><th style="width: 120px">接入信息</th><th style="width: 110px">运行状态</th><th style="width: 140px">Agent 遥测</th><th style="width: 160px">最后心跳</th><th style="width: 150px">操作</th></tr></thead>
           <tbody>
             <tr v-if="loading && filteredRows.length === 0"><td colspan="8"><n-skeleton text :repeat="3" /></td></tr>
             <tr v-else-if="filteredRows.length === 0"><td colspan="8" class="empty">暂无匹配的 Spoke</td></tr>
             <tr v-for="row in filteredRows" :key="rowKey(row)" :class="{ manageable: !!row.managed }" @click="row.managed && openManaged(row.managed.id)">
-              <td class="address-cell">{{ row.spoke?.protocol_address || row.managed?.protocol_address || '-' }}</td>
-              <td class="address-cell"><span v-if="row.hubId">{{ row.hubMemberId }}</span><span v-else class="text-muted">未接入</span></td>
-              <td><template v-if="row.managed"><strong>{{ row.managed.name }}</strong> <code>{{ row.managed.id }}</code></template><template v-else-if="row.spoke?.alias"><strong>{{ row.spoke.alias }}</strong></template><span v-else class="text-muted">-</span></td>
+              <td class="address-cell"><span class="text-ellipsis" :title="row.spoke?.protocol_address || row.managed?.protocol_address || '-'">{{ row.spoke?.protocol_address || row.managed?.protocol_address || '-' }}</span></td>
+              <td class="address-cell"><span v-if="row.hubId" class="text-ellipsis" :title="row.hubMemberId">{{ row.hubMemberId }}</span><span v-else class="text-muted">未接入</span></td>
+              <td><div v-if="row.managed" class="spoke-identity"><strong class="text-ellipsis" :title="row.managed.name">{{ row.managed.name }}</strong><code class="text-ellipsis" :title="row.managed.id">{{ row.managed.id }}</code></div><strong v-else-if="row.spoke?.alias" class="text-ellipsis" :title="row.spoke.alias">{{ row.spoke.alias }}</strong><span v-else class="text-muted">-</span></td>
               <td><span v-if="row.spoke" class="access-tags"><n-tag size="tiny" :type="row.spoke.type === 'shadow' ? 'info' : 'success'">{{ row.spoke.type }}</n-tag><n-tag v-if="row.spoke.registration_mode" size="tiny" type="info">{{ row.spoke.registration_mode === 'ha' ? 'HA' : row.spoke.registration_mode }}</n-tag></span><span v-else class="text-muted">-</span></td>
               <td><n-tag v-if="row.managed" size="tiny" :type="row.managed.status === 'online' ? 'success' : row.managed.status === 'degraded' ? 'warning' : 'default'">Agent {{ statusText(row.managed.status) }}</n-tag><n-tag v-else size="tiny">未纳管</n-tag></td>
               <td><span v-if="row.managed">Peers {{ row.managed.peer_count }} · {{ row.managed.ws_rtt_ms ? `${row.managed.ws_rtt_ms.toFixed(1)} ms` : '-' }}</span><span v-else class="text-muted">-</span></td>
@@ -44,25 +44,21 @@
       </n-scrollbar>
     </n-card>
 
-    <n-modal :show="showManage" display-directive="if" preset="card" size="small" :title="manageTitle" class="manage-modal" @update:show="handleManageVisibility">
+    <n-modal :show="showManage" display-directive="if" preset="card" size="small" class="manage-modal" @update:show="handleManageVisibility">
+      <template #header><span class="text-ellipsis" :title="manageTitle">{{ manageTitle }}</span></template>
       <template #header-extra><n-space @click.stop><n-popconfirm :disabled="!store.isAdmin" @positive-click="rotateToken(selectedManagedId)"><template #trigger><n-button size="small" warning secondary :disabled="!store.isAdmin">轮换令牌</n-button></template>轮换后当前 Agent 会立即断开，确定继续？</n-popconfirm><n-popconfirm :disabled="!store.isAdmin" @positive-click="deleteManagedSpoke"><template #trigger><n-button size="small" type="error" secondary :disabled="!store.isAdmin">删除登记</n-button></template>删除登记并立即撤销访问，确定继续？</n-popconfirm></n-space></template>
       <n-spin :show="detailLoading">
-        <n-grid :cols="1" :y-gap="12" class="mb-4">
-          <n-grid-item><n-card size="small" title="OpenNHRP 接口" class="peer-summary-card"><n-table size="small" :bordered="false"><thead><tr><th>名称</th><th style="width: 180px">Protocol IP</th><th style="width: 180px">NBMA</th><th style="width: 100px">MTU</th></tr></thead><tbody><tr v-if="interfaces.length === 0"><td colspan="4" class="empty">暂无接口数据</td></tr><tr v-for="item in interfaces" :key="item.name"><td><code>{{ item.name }}</code></td><td>{{ item.protocol_address || '-' }}</td><td>{{ item.nbma_address || '-' }}</td><td>{{ item.mtu || '-' }}</td></tr></tbody></n-table></n-card></n-grid-item>
-          <n-grid-item><n-card size="small" title="当前 Hub / NHRP peers" class="peer-summary-card"><n-table size="small" :bordered="false"><thead><tr><th style="width: 180px">Protocol IP</th><th>NBMA</th><th style="width: 120px">接口</th><th style="width: 120px">类型</th><th style="width: 120px">租约</th></tr></thead><tbody><tr v-if="peers.length === 0"><td colspan="5" class="empty">暂无 peer 数据</td></tr><tr v-for="peer in peers" :key="`${peer.interface}-${peer.protocol_address}`"><td>{{ peer.protocol_address }}</td><td>{{ peer.nbma_address || '-' }}</td><td>{{ peer.interface }}</td><td>{{ peer.type }}</td><td>{{ peer.expires_in_sec }}s<span v-if="peer.stale">（缓存）</span></td></tr></tbody></n-table></n-card></n-grid-item>
-        </n-grid>
-
         <n-card v-if="haStatus" size="small" title="Spoke HA Hub 路径与质量" class="mb-4">
           <div class="ha-summary"><span>接口: <code>{{ haStatus.interface }}</code></span><span>当前 Hub: <code>{{ haStatus.active_member || '-' }}</code></span><span>选择模式: <n-tag size="small" :type="haStatus.selection_mode === 'manual' ? 'warning' : 'info'">{{ haStatus.selection_mode === 'manual' ? (haStatus.manual_suspended ? '手动（HA 接管中）' : '手动') : '自动' }}</n-tag></span><span v-if="haStatus.selection_mode === 'manual'">手动目标: <code>{{ haStatus.manual_member }}</code></span><span>协调器: {{ haStatus.coordinator_state }}</span><span>切换: {{ haStatus.switching ? '进行中' : '稳定' }}</span><n-popconfirm v-if="haStatus.selection_mode === 'manual'" :disabled="!store.isAdmin || !!modeChanging" @positive-click="setHAMode('auto')"><template #trigger><n-button size="tiny" secondary :loading="modeChanging === 'auto'" :disabled="!store.isAdmin || !!modeChanging">恢复自动</n-button></template>清除手动目标并恢复自动评分切换策略？</n-popconfirm></div>
           <p>失败率统计最近 60 秒内已完成的探测，包含超时和无效回复。评分 RTT 独立平滑；SRTT 用于超时估计。</p>
           <n-table size="small" :bordered="false"><thead><tr><th style="width: 150px">Hub</th><th style="width: 100px">状态</th><th style="width: 150px">Selected endpoint</th><th style="width: 150px">评分 RTT</th><th style="width: 170px">探测失败率</th><th style="width: 180px">有效总分</th><th>Term / Leader</th><th style="width: 130px">操作</th></tr></thead><tbody>
             <tr v-if="haStatus.candidates.length === 0"><td colspan="8" class="empty">暂无 Hub 候选</td></tr>
-            <tr v-for="candidate in haStatus.candidates" :key="candidate.member">
-              <td><strong>{{ candidate.member }}</strong> <n-tag v-if="candidate.active" size="tiny" type="success">当前</n-tag> <n-tag v-if="haStatus.manual_member === candidate.member" size="tiny" type="warning">手动目标</n-tag></td>
+            <tr v-for="candidate in [...haStatus.candidates].sort((a, b) => b.priority - a.priority)" :key="candidate.member">
+              <td><span class="candidate-identity"><strong class="text-ellipsis" :title="candidate.member">{{ candidate.member }}</strong><n-tag v-if="candidate.active" size="tiny" type="success">当前</n-tag><n-tag v-if="haStatus.manual_member === candidate.member" size="tiny" type="warning">手动目标</n-tag></span></td>
               <td>
                 <n-tag size="small" :type="candidate.ready ? 'success' : candidate.state === 'suspect' ? 'warning' : 'default'">{{ candidate.state }}</n-tag>
               </td>
-              <td><code>{{ candidate.selected_address || '-' }}</code></td>
+              <td><code class="text-ellipsis" :title="candidate.selected_address || '-'">{{ candidate.selected_address || '-' }}</code></td>
               <td>
                 <div class="ha-metric-value">{{ candidate.quality_rtt_ms == null ? '—' : candidate.quality_rtt_ms.toFixed(1) + ' ms' }}</div>
                 <div class="ha-metric-details">
@@ -85,12 +81,16 @@
                   <span><i>优先级</i><b>{{ candidate.priority_score?.toFixed(2) ?? '—' }}</b></span>
                 </div>
               </td>
-              <td>{{ candidate.term }} / {{ candidate.leader || '-' }}</td>
+              <td><span class="text-ellipsis" :title="`${candidate.term} / ${candidate.leader || '-'}`">{{ candidate.term }} / {{ candidate.leader || '-' }}</span></td>
               <td><span v-if="candidate.active || haStatus.manual_member === candidate.member">-</span><n-popconfirm v-else :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated" @positive-click="setHAMode('manual', candidate.member)"><template #trigger><n-button size="tiny" secondary type="warning" :loading="modeChanging === candidate.member" :disabled="!store.isAdmin || !!modeChanging || !!haStatus.switching || !candidate.ready || !candidate.authenticated">设为手动目标</n-button></template>将当前 Spoke 手动切换到 {{ candidate.member }}？</n-popconfirm></td>
             </tr>
           </tbody></n-table>
         </n-card>
 
+        <n-grid :cols="1" :y-gap="12" class="mb-4">
+          <n-grid-item><n-card size="small" title="OpenNHRP 接口" class="peer-summary-card"><n-table size="small" :bordered="false"><thead><tr><th>名称</th><th style="width: 180px">Protocol IP</th><th style="width: 180px">NBMA</th><th style="width: 100px">MTU</th></tr></thead><tbody><tr v-if="interfaces.length === 0"><td colspan="4" class="empty">暂无接口数据</td></tr><tr v-for="item in interfaces" :key="item.name"><td><code class="text-ellipsis" :title="item.name">{{ item.name }}</code></td><td><span class="text-ellipsis" :title="item.protocol_address || '-'">{{ item.protocol_address || '-' }}</span></td><td><span class="text-ellipsis" :title="item.nbma_address || '-'">{{ item.nbma_address || '-' }}</span></td><td>{{ item.mtu || '-' }}</td></tr></tbody></n-table></n-card></n-grid-item>
+          <n-grid-item><n-card size="small" title="当前 Hub / NHRP peers" class="peer-summary-card"><n-table size="small" :bordered="false"><thead><tr><th style="width: 180px">Protocol IP</th><th>NBMA</th><th style="width: 120px">接口</th><th style="width: 120px">类型</th><th style="width: 120px">租约</th></tr></thead><tbody><tr v-if="peers.length === 0"><td colspan="5" class="empty">暂无 peer 数据</td></tr><tr v-for="peer in peers" :key="`${peer.interface}-${peer.protocol_address}`"><td><span class="text-ellipsis" :title="peer.protocol_address">{{ peer.protocol_address }}</span></td><td><span class="text-ellipsis" :title="peer.nbma_address || '-'">{{ peer.nbma_address || '-' }}</span></td><td><span class="text-ellipsis" :title="peer.interface">{{ peer.interface }}</span></td><td>{{ peer.type }}</td><td>{{ peer.expires_in_sec }}s<span v-if="peer.stale">（缓存）</span></td></tr></tbody></n-table></n-card></n-grid-item>
+        </n-grid>
       </n-spin>
     </n-modal>
 
@@ -248,6 +248,12 @@ onBeforeUnmount(stopHARefresh)
 .table-card { flex: 1; min-height: 0; overflow: hidden; }
 .table-card :deep(.n-card-content) { box-sizing: border-box; height: 100%; min-height: 0; }
 .address-cell { white-space: nowrap; }
+.spoke-identity, .candidate-identity { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.spoke-identity strong, .candidate-identity strong { flex: 1 1 auto; }
+.spoke-identity code { flex: 0 1 40%; }
+.candidate-identity :deep(.n-tag) { flex: none; }
+.candidate-identity { flex-wrap: wrap; }
+.candidate-identity strong { flex-basis: 100%; }
 .access-tags { display: inline-flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
 tbody tr.manageable { cursor: pointer; }
 tbody tr.manageable:hover { background: var(--bg-card-secondary); }

@@ -54,8 +54,8 @@ ws.addEventListener('message', async event => {
   else if (path === '/api/config/file') body = { content: 'interface tun0' }
   else if (path === '/api/config/audit-logs') body = { items: [], total: 0 }
   else if (path.endsWith('/ha')) body = { candidates: [
-    { member: 'hub-a', state: 'ready', ready: true, active: true, authenticated: true, selected_address: '192.0.2.1', term: 1, leader: 'hub-a', srtt_ms: 12.5, quality_rtt_ms: 20.1, loss_pct: 1.67, quality_samples: 60, quality_failures: 1, last_quality_reply_age_ms: 150, quality_valid: true, loss_score: 56.666667, latency_score: 27.245455, priority_score: 10, score: 94 },
-    { member: 'unknown', state: 'probing', ready: false, authenticated: false, selected_address: '', term: 1, srtt_ms: 0, quality_rtt_ms: null, loss_pct: 100, quality_samples: 0, quality_failures: 0, last_quality_reply_age_ms: null, quality_valid: false, loss_score: 0, latency_score: 0, priority_score: 10, score: 0 },
+    { member: 'hub-a', priority: 90, state: 'ready', ready: true, active: true, authenticated: true, selected_address: '192.0.2.1', term: 1, leader: 'hub-a', srtt_ms: 12.5, quality_rtt_ms: 20.1, loss_pct: 1.67, quality_samples: 60, quality_failures: 1, last_quality_reply_age_ms: 150, quality_valid: true, loss_score: 56.666667, latency_score: 27.245455, priority_score: 10, score: 94 },
+    { member: 'unknown', priority: 100, state: 'probing', ready: false, authenticated: false, selected_address: '', term: 1, srtt_ms: 0, quality_rtt_ms: null, loss_pct: 100, quality_samples: 0, quality_failures: 0, last_quality_reply_age_ms: null, quality_valid: false, loss_score: 0, latency_score: 0, priority_score: 10, score: 0 },
   ], active_member: 'hub-a', selection_mode: 'auto' }
   await send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(body)).toString('base64') })
 })
@@ -92,7 +92,7 @@ try {
       close() { this.readyState = 3; }
     };
   ` })
-  for (const width of [1280, 375]) {
+  for (const width of [877, 1280, 1754, 375]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 769 })
     await send('Page.navigate', { url: `${origin}/spokes` })
     await until(`document.body?.textContent?.includes('离线设备') && document.querySelector('.spoke-panel .n-alert')?.textContent?.includes('故障 Hub')`)
@@ -114,11 +114,13 @@ try {
     await evaluate(`[...document.querySelectorAll('tbody tr')].find(e => e.textContent.includes('北京 Hub') && e.textContent.includes('天翼云')).click()`)
     await until(`location.search.includes('node=ctyun') && !!document.querySelector('.manage-modal')`)
     await until(`document.body.textContent.includes('评分 RTT') && document.body.textContent.includes('20.1 ms')`)
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.candidate-identity strong')].map(e => e.textContent)`), ['unknown', 'hub-a'])
     await new Promise(resolve => setTimeout(resolve, 250))
     assert.equal(await evaluate(`document.body.textContent.includes('opennhrp.conf') || document.body.textContent.includes('节点实时日志')`), false)
     assert.equal(await evaluate(`document.querySelector('.manage-modal').getBoundingClientRect().width <= 1401`), true)
     if (width === 1280) assert.equal(await evaluate(`document.querySelector('.manage-modal').getBoundingClientRect().width > 1200`), true)
     assert.equal(await evaluate(`document.querySelectorAll('.manage-modal table').length`), 3)
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.manage-modal .n-card .n-card-header__main')].map(e => e.textContent.trim())`), ['Spoke HA Hub 路径与质量', 'OpenNHRP 接口', '当前 Hub / NHRP peers'])
     assert.deepEqual(await evaluate(`[...document.querySelectorAll('.manage-modal th')].filter(th => getComputedStyle(th).whiteSpace !== 'nowrap' || th.scrollWidth > th.clientWidth + 2).map(th => th.textContent.trim())`), [])
     if (width === 375) {
       assert.equal(await evaluate(`(() => { const areas = [...document.querySelectorAll('.manage-modal .n-card-content')].filter(el => el.scrollWidth > el.clientWidth + 2); return areas.length > 0 && areas.every(el => { el.scrollLeft = el.scrollWidth; return el.scrollLeft > 0 }) })()`), true)
