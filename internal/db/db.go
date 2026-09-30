@@ -208,6 +208,7 @@ func (d *DB) migrate() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_probes_time ON witness_probes(recorded_at);
 	CREATE INDEX IF NOT EXISTS idx_probes_node_time ON witness_probes(target_node_id, recorded_at);
+	CREATE INDEX IF NOT EXISTS idx_probes_node_type_id ON witness_probes(target_node_id, probe_type, id);
 
 	CREATE TABLE IF NOT EXISTS witness_arbitrations (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -471,16 +472,15 @@ func (d *DB) GetRecentProbesContext(ctx context.Context, targetNodeID string, li
 		limit = 10
 	}
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, target_node_id, probe_type, target_ip, rtt_ms, loss_rate, success, detail, recorded_at
-		 FROM (
-			SELECT id, target_node_id, probe_type, target_ip, rtt_ms, loss_rate, success, detail, recorded_at,
-				ROW_NUMBER() OVER (PARTITION BY probe_type ORDER BY id DESC) AS row_number
-			FROM witness_probes
-			WHERE target_node_id = ?
+		`SELECT p.id, p.target_node_id, p.probe_type, p.target_ip, p.rtt_ms, p.loss_rate, p.success, p.detail, p.recorded_at
+		 FROM (SELECT DISTINCT probe_type FROM witness_probes WHERE target_node_id = ?) AS types
+		 JOIN witness_probes AS p ON p.id IN (
+			SELECT id FROM witness_probes
+			WHERE target_node_id = ? AND probe_type = types.probe_type
+			ORDER BY id DESC LIMIT ?
 		 )
-		 WHERE row_number <= ?
-		 ORDER BY id DESC`,
-		targetNodeID, limit,
+		 ORDER BY p.id DESC`,
+		targetNodeID, targetNodeID, limit,
 	)
 	if err != nil {
 		return nil, err

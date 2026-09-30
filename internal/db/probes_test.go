@@ -132,3 +132,43 @@ func TestCleanupOldProbesUsesLocalCutoff(t *testing.T) {
 		t.Fatalf("cleanup kept old=%d new=%d", oldCount, newCount)
 	}
 }
+
+func TestRecentProbesKeepsSparseTypesAndFiltersNodes(t *testing.T) {
+	database, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.Exec(`
+		INSERT INTO witness_probes (target_node_id, probe_type, target_ip) VALUES
+		('hub-a', 'custom', ''), ('hub-a', 'l3_nbma', '');
+		WITH RECURSIVE history(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM history WHERE n<10000)
+		INSERT INTO witness_probes (target_node_id, probe_type, target_ip)
+		SELECT 'hub-a', 'l4_port', '' FROM history;
+		INSERT INTO witness_probes (target_node_id, probe_type, target_ip) VALUES ('hub-b', 'l4_port', '');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	for _, limit := range []int{1, 10, 0} {
+		probes, err := database.GetRecentProbes("hub-a", limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := limit
+		if want == 0 {
+			want = 10
+		}
+		if len(probes) != want+2 {
+			t.Fatalf("limit %d: got %d probes, want %d", limit, len(probes), want+2)
+		}
+		for i, probe := range probes {
+			wantID := int64(10002 - i)
+			if i >= want {
+				wantID = int64(want + 2 - i)
+			}
+			if probe.TargetNodeID != "hub-a" || probe.ID != wantID {
+				t.Fatalf("limit %d, index %d: unexpected probe %+v, want ID %d", limit, i, probe, wantID)
+			}
+		}
+	}
+}
