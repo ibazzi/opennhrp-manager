@@ -193,41 +193,36 @@
 
             <!-- Text Labels: Witness Above, other nodes Underneath -->
             <!-- 1. Primary Title (Member Name / IP) -->
-            <text
-              :y="node.type === 'witness' ? -(node.radius + 18) : (node.radius + 18)"
-              :fill="store.isDark ? '#f4f4f5' : '#0f172a'"
-              :font-size="node.type === 'spoke' ? 11 : 13"
-              font-weight="700"
-              font-family="'Fira Code', monospace"
-              text-anchor="middle"
+            <foreignObject
+              :x="node.type === 'spoke' ? -42 : -65"
+              :y="node.type === 'witness' ? -(node.radius + 31) : (node.radius + 5)"
+              :width="node.type === 'spoke' ? 84 : 130"
+              height="18"
             >
-              {{ node.title }}
-            </text>
+              <div class="topology-node-label text-ellipsis" :title="node.title" :style="{ color: store.isDark ? '#f4f4f5' : '#0f172a', fontSize: node.type === 'spoke' ? '11px' : '13px', fontWeight: 700 }">{{ node.title }}</div>
+            </foreignObject>
 
             <!-- 2. Subtitle 1 (IP / Role text / SLA) -->
-            <text
+            <foreignObject
               v-if="node.subtitle1"
-              :y="node.type === 'witness' ? -(node.radius + 5) : (node.radius + 32)"
-              :fill="node.sub1Color || (store.isDark ? '#94a3b8' : '#475569')"
-              :font-size="node.type === 'spoke' ? 10 : 11"
-              font-weight="500"
-              font-family="'Fira Code', monospace"
-              text-anchor="middle"
+              :x="node.type === 'spoke' ? -42 : -65"
+              :y="node.type === 'witness' ? -(node.radius + 18) : (node.radius + 19)"
+              :width="node.type === 'spoke' ? 84 : 130"
+              height="18"
             >
-              {{ node.subtitle1 }}
-            </text>
+              <div class="topology-node-label text-ellipsis" :title="node.subtitle1" :style="{ color: node.sub1Color || (store.isDark ? '#94a3b8' : '#475569'), fontSize: node.type === 'spoke' ? '10px' : '11px' }">{{ node.subtitle1 }}</div>
+            </foreignObject>
 
             <!-- 3. Subtitle 2 (Role Priority / Alias / Additional Info) -->
-            <text
+            <foreignObject
               v-if="node.subtitle2 && node.type !== 'witness'"
-              :y="node.radius + 45"
-              :fill="node.sub2Color || (store.isDark ? '#71717a' : '#64748b')"
-              font-size="10"
-              font-weight="500"
-              text-anchor="middle"
+              :x="node.type === 'spoke' ? -42 : -65"
+              :y="node.radius + 32"
+              :width="node.type === 'spoke' ? 84 : 130"
+              height="18"
             >
-              {{ node.subtitle2 }}
-            </text>
+              <div class="topology-node-label text-ellipsis" :title="node.subtitle2" :style="{ color: node.sub2Color || (store.isDark ? '#71717a' : '#64748b') }">{{ node.subtitle2 }}</div>
+            </foreignObject>
           </g>
         </g>
       </svg>
@@ -1215,6 +1210,15 @@ watch(
 
 .node-group text {
   transition: fill 1s ease, opacity 1s ease;
+}
+
+.topology-node-label {
+  width: 100%;
+  line-height: 18px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: 'Fira Code', monospace;
 }
 
 .active-selected-ring {

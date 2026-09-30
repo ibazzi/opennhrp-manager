@@ -70,10 +70,10 @@
     <n-modal
       v-model:show="showEditModal"
       preset="card"
-      :title="`编辑用户: ${editingUser?.username}`"
       style="width: 480px; max-width: calc(100vw - 32px);"
       :bordered="false"
     >
+      <template #header><span class="text-ellipsis" :title="`编辑用户: ${editingUser?.username}`">编辑用户: {{ editingUser?.username }}</span></template>
       <n-form ref="editFormRef" :model="editForm">
         <n-form-item label="用户名">
           <n-input :value="editingUser?.username" disabled />
@@ -273,7 +273,7 @@ const columns: DataTableColumns<UserRecord> = [
     render(row) {
       const isSelf = store.currentUser?.id === row.id
       return h('div', { class: 'user-name-cell' }, [
-        h('strong', row.username),
+        h('strong', { class: 'text-ellipsis', title: row.username }, row.username),
         isSelf ? h(NTag, { size: 'tiny', type: 'info', class: 'ml-2', round: true }, { default: () => '当前账号' }) : null,
       ])
     },
@@ -395,6 +395,11 @@ onMounted(loadUsers)
 .user-name-cell {
   display: flex;
   align-items: center;
+  min-width: 0;
+}
+
+.user-name-cell strong {
+  flex: 1 1 auto;
 }
 
 .ml-2 {

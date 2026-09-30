@@ -18,7 +18,7 @@
     <!-- Interfaces Table -->
     <n-card title="OpenNHRP 接口 (Interfaces)" class="mb-4 interfaces-card">
       <div class="interfaces-table-scroll">
-        <n-table :bordered="false" :single-line="true" style="min-width: 640px;">
+        <n-table :bordered="false" :single-line="true" style="min-width: 760px; table-layout: fixed;">
           <thead>
             <tr>
               <th>接口名称 (Name)</th>
@@ -33,10 +33,10 @@
               <td colspan="5" class="text-center text-muted">正在加载接口数据...</td>
             </tr>
             <tr v-for="iface in interfaces" :key="iface.name">
-              <td><strong>{{ iface.name }}</strong></td>
+              <td><strong class="text-ellipsis" :title="iface.name">{{ iface.name }}</strong></td>
               <td><n-tag size="small" type="info">{{ iface.type || '-' }}</n-tag></td>
-              <td><code>{{ iface.protocol_address || '-' }}</code></td>
-              <td><code>{{ iface.nbma_address || '-' }}</code></td>
+              <td><code class="text-ellipsis" :title="iface.protocol_address || '-'">{{ iface.protocol_address || '-' }}</code></td>
+              <td><code class="text-ellipsis" :title="iface.nbma_address || '-'">{{ iface.nbma_address || '-' }}</code></td>
               <td>{{ iface.mtu || '-' }}</td>
             </tr>
           </tbody>

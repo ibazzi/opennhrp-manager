@@ -38,8 +38,8 @@
         <n-grid-item v-for="item in slaList" :key="item.node_id">
           <n-card class="sla-card" :class="item.overall_state || 'healthy'">
             <div class="sla-card-header">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="node-title">{{ getNodeDisplayName(item.node_id) }}</span>
+              <div class="sla-card-name">
+                <span class="node-title text-ellipsis" :title="getNodeDisplayName(item.node_id)">{{ getNodeDisplayName(item.node_id) }}</span>
                 <n-tag v-if="item.firewall_protected" type="info" size="tiny" round>
                   防火墙隔离
                 </n-tag>
@@ -97,9 +97,10 @@
     </n-grid>
 
     <!-- Selected Hub's current Spokes -->
-    <n-card v-if="selectedNode !== 'all'" :title="`${getNodeDisplayName(selectedNode)} 当前连接的 Spoke`" class="mb-4">
+    <n-card v-if="selectedNode !== 'all'" class="mb-4">
+      <template #header><span class="text-ellipsis" :title="`${getNodeDisplayName(selectedNode)} 当前连接的 Spoke`">{{ getNodeDisplayName(selectedNode) }} 当前连接的 Spoke</span></template>
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 760px;">
+        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 760px; table-layout: fixed;">
           <thead>
             <tr>
               <th style="width: 160px;">Protocol 地址</th>
@@ -121,9 +122,9 @@
               <td colspan="6" class="text-center text-gray-500">当前 Hub 没有可显示的 Spoke</td>
             </tr>
             <tr v-for="spoke in selectedSpokes" :key="`${spoke.interface}-${spoke.protocol_address}-${spoke.nbma_address}`">
-              <td>{{ spoke.protocol_address }}</td>
-              <td>{{ spoke.nbma_address }}</td>
-              <td>{{ spoke.interface }}</td>
+              <td><span class="text-ellipsis" :title="spoke.protocol_address">{{ spoke.protocol_address }}</span></td>
+              <td><span class="text-ellipsis" :title="spoke.nbma_address">{{ spoke.nbma_address }}</span></td>
+              <td><span class="text-ellipsis" :title="spoke.interface">{{ spoke.interface }}</span></td>
               <td>{{ spoke.type }}<span v-if="spoke.stale">（缓存）</span></td>
               <td>{{ spoke.flags || '-' }}</td>
               <td>{{ spoke.expires_in_sec }}s</td>
@@ -203,14 +204,14 @@
     <!-- Arbitration Decisions History -->
     <n-card title="Witness 历史仲裁事件（非当前状态）">
       <n-scrollbar style="max-height: 260px;" x-scrollable>
-        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 750px; table-layout: auto;">
+        <n-table :bordered="false" :single-line="true" size="small" style="min-width: 750px; table-layout: fixed;">
           <thead class="sticky-thead">
             <tr>
               <th style="width: 170px;">事件时间</th>
               <th style="width: 80px;">Term</th>
               <th style="width: 180px;">相关 Hub</th>
               <th style="width: 120px;">仲裁决策</th>
-              <th style="min-width: 220px;">判定依据与推理</th>
+              <th style="width: 220px;">判定依据与推理</th>
             </tr>
           </thead>
           <tbody>
@@ -220,9 +221,9 @@
             <tr v-for="a in arbitrations" :key="a.id">
               <td>{{ a.recorded_at ? new Date(a.recorded_at).toLocaleString() : '' }}</td>
               <td><code>Term {{ a.term }}</code></td>
-              <td>{{ arbitrationNodes(a) }}</td>
+              <td><span class="text-ellipsis" :title="arbitrationNodes(a)">{{ arbitrationNodes(a) }}</span></td>
               <td>
-                <n-tag :type="a.decision && a.decision.includes('approve') ? 'success' : a.decision && a.decision.includes('alert') ? 'error' : 'info'" size="small">
+                <n-tag class="value-tag" :title="a.decision || 'N/A'" :type="a.decision && a.decision.includes('approve') ? 'success' : a.decision && a.decision.includes('alert') ? 'error' : 'info'" size="small">
                   {{ a.decision || 'N/A' }}
                 </n-tag>
               </td>
@@ -467,6 +468,17 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 10px;
   min-height: 24px;
+}
+
+.sla-card-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sla-card-name :deep(.n-tag) {
+  flex: none;
 }
 
 .node-title {

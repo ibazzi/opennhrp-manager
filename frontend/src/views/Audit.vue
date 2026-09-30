@@ -10,7 +10,7 @@
 
     <n-card title="配置操作与审计日志 (Audit Logs)" class="audit-card">
       <div class="audit-table-scroll">
-        <n-table class="audit-table" :bordered="false" :single-line="true" size="small" style="min-width: 1000px;">
+        <n-table class="audit-table" :bordered="false" :single-line="true" size="small" style="min-width: 1000px; table-layout: fixed;">
           <thead>
             <tr>
               <th style="width: 170px;">操作时间</th>
@@ -30,9 +30,9 @@
             </tr>
             <tr v-for="log in auditLogs" :key="log.id">
               <td>{{ new Date(log.created_at).toLocaleString() }}</td>
-              <td><code>{{ log.node_id }}</code></td>
-              <td><n-tag class="action-tag" size="tiny" type="info">{{ log.action }}</n-tag></td>
-              <td>{{ log.operator }}</td>
+              <td><code class="text-ellipsis" :title="log.node_id">{{ log.node_id }}</code></td>
+              <td><n-tag class="action-tag" size="tiny" type="info" :title="log.action">{{ log.action }}</n-tag></td>
+              <td><span class="text-ellipsis" :title="log.operator">{{ log.operator }}</span></td>
               <td class="allow-wrap">{{ log.detail || '-' }}</td>
               <td>
                 <n-tag size="tiny" :type="log.success ? 'success' : 'error'">
@@ -127,16 +127,14 @@ onMounted(loadLogs)
 
 .audit-table :deep(.action-tag) {
   box-sizing: border-box;
-  height: auto;
   max-width: 100%;
-  line-height: 1.4;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  overflow: hidden;
 }
 
 .audit-table :deep(.action-tag .n-tag__content) {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .text-center {

@@ -36,7 +36,7 @@
           </div>
           <div class="stat-meta">
             <n-skeleton v-if="loading && !cluster" text style="width: 85%; height: 12px; border-radius: 3px;" />
-            <span v-else>Member: {{ cluster?.member || store.activeNodeId }} | Term: {{ cluster?.term || 0 }}{{ cluster?.stale ? ' | 缓存' : '' }}</span>
+            <span v-else class="text-ellipsis" :title="cluster?.member || store.activeNodeId">Member: {{ cluster?.member || store.activeNodeId }} | Term: {{ cluster?.term || 0 }}{{ cluster?.stale ? ' | 缓存' : '' }}</span>
           </div>
         </n-card>
       </n-grid-item>
@@ -46,7 +46,7 @@
           <div class="stat-label">当前集群 Leader</div>
           <div class="stat-value text-emerald">
             <n-skeleton v-if="loading && !cluster" text style="width: 65%; height: 18px; border-radius: 4px;" />
-            <span v-else class="icon-value"><n-icon><TrophyOutline /></n-icon>{{ cluster?.leader || '-' }}</span>
+            <span v-else class="icon-value"><n-icon><TrophyOutline /></n-icon><span class="text-ellipsis" :title="cluster?.leader || '-'">{{ cluster?.leader || '-' }}</span></span>
           </div>
           <div class="stat-meta">
             <n-skeleton v-if="loading && !cluster" text style="width: 90%; height: 12px; border-radius: 3px;" />
@@ -74,11 +74,11 @@
           <div class="stat-label">Witness 见证状态</div>
           <div class="stat-value text-amber">
             <n-skeleton v-if="loading && !cluster" text style="width: 65%; height: 18px; border-radius: 4px;" />
-            <span v-else>{{ witnessLabel }}</span>
+            <span v-else class="text-ellipsis" :title="witnessLabel">{{ witnessLabel }}</span>
           </div>
           <div class="stat-meta">
             <n-skeleton v-if="loading && slaMatrix.length === 0" text style="width: 70%; height: 12px; border-radius: 3px;" />
-            <span v-else>{{ witnessMeta }}</span>
+            <span v-else class="text-ellipsis" :title="witnessMeta">{{ witnessMeta }}</span>
           </div>
         </n-card>
       </n-grid-item>
@@ -124,7 +124,7 @@
                     <td colspan="3" class="text-center text-muted">未配置 HA 健康探测目标</td>
                   </tr>
                   <tr v-for="target in cluster?.health_targets" :key="target.target_ip">
-                    <td><code>{{ target.target_ip }}</code></td>
+                    <td><code class="text-ellipsis" :title="target.target_ip">{{ target.target_ip }}</code></td>
                     <td>
                       <n-badge :type="target.last_success ? 'success' : 'error'" :value="target.last_success ? 'OK' : 'FAIL'" />
                     </td>
@@ -160,8 +160,8 @@
                     <td colspan="4" class="text-center text-muted">暂无活跃注册 Spoke</td>
                   </tr>
                   <tr v-for="spoke in spokes" :key="spoke.protocol_address">
-                    <td><strong>{{ spoke.protocol_address }}</strong></td>
-                    <td><code>{{ spoke.nbma_address }}</code></td>
+                    <td><strong class="text-ellipsis" :title="spoke.protocol_address">{{ spoke.protocol_address }}</strong></td>
+                    <td><code class="text-ellipsis" :title="spoke.nbma_address">{{ spoke.nbma_address }}</code></td>
                     <td>
                       <n-tag size="tiny" :type="spoke.type === 'direct' ? 'success' : 'info'">
                         {{ spoke.type }}
@@ -511,6 +511,7 @@ watch(
 
 .side-table {
   width: 100%;
+  table-layout: fixed;
 }
 
 .side-table thead,

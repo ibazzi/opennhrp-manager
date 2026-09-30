@@ -81,7 +81,7 @@
                     >
                       <n-button size="small" secondary round class="user-btn">
                         <n-icon class="mr-1"><component :is="store.isAdmin ? ShieldCheckmarkOutline : EyeOutline" /></n-icon>
-                        <span class="user-name">{{ store.currentUser?.username || '用户' }}</span>
+                        <span class="user-name text-ellipsis" :title="store.currentUser?.username || '用户'">{{ store.currentUser?.username || '用户' }}</span>
                         <n-tag v-if="!isMobile" size="tiny" :type="store.isAdmin ? 'success' : 'default'" round class="ml-1">
                           {{ store.isAdmin ? '管理员' : '只读' }}
                         </n-tag>
@@ -507,6 +507,42 @@ code {
 }
 
 /* Keep table headings readable; wide tables scroll inside their containers. */
+.text-ellipsis {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-value {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.icon-value > .text-ellipsis {
+  flex: 1 1 auto;
+}
+
+.n-card-header__main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value-tag {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.value-tag .n-tag__content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .n-table {
   table-layout: auto;
   width: 100%;

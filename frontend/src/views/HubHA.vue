@@ -44,7 +44,7 @@
           <div class="card-header-label">集群共识与 Leader</div>
           <div class="card-large-text text-emerald">
             <n-skeleton v-if="loading && !cluster" text style="width: 60%; height: 20px; border-radius: 4px;" />
-            <span v-else class="icon-value"><n-icon><TrophyOutline /></n-icon>{{ cluster?.leader || '-' }}</span>
+            <span v-else class="icon-value"><n-icon><TrophyOutline /></n-icon><span class="text-ellipsis" :title="cluster?.leader || '-'">{{ cluster?.leader || '-' }}</span></span>
           </div>
           <div class="card-meta-list">
             <template v-if="loading && !cluster">
@@ -52,7 +52,7 @@
               <div class="sub-info"><n-skeleton text style="width: 90%; height: 13px;" /></div>
             </template>
             <template v-else>
-              <div class="sub-info">ID: <code>{{ shortValue(cluster?.cluster_id) }}</code> | Primary: {{ cluster?.primary || '-' }}</div>
+              <div class="sub-info"><span>ID:</span><code class="text-ellipsis meta-value" :title="cluster?.cluster_id || '-'">{{ cluster?.cluster_id || '-' }}</code><span>| Primary:</span><span class="text-ellipsis meta-value" :title="cluster?.primary || '-'">{{ cluster?.primary || '-' }}</span></div>
               <div class="sub-info">活跃: {{ haOnlineCount }} / 共 {{ members.length }} 节点 | Term {{ cluster?.term || 0 }} · Commit {{ cluster?.commit_index ?? 0 }}</div>
             </template>
           </div>
@@ -117,7 +117,7 @@
             </template>
             <template v-else>
               <div class="sub-info">快照: 收 {{ replication?.snapshots_received ?? 0 }} / 发 {{ replication?.snapshots_sent ?? 0 }} | 增量: 收 {{ replication?.deltas_received ?? 0 }} / 发 {{ replication?.deltas_sent ?? 0 }}</div>
-              <div class="sub-info">Digest: {{ shortValue(replication?.digest) }} | 重同步: {{ replication?.resync_requests ?? 0 }}</div>
+              <div class="sub-info"><span>Digest:</span><span class="text-ellipsis meta-value" :title="replication?.digest || '-'">{{ replication?.digest || '-' }}</span><span>| 重同步: {{ replication?.resync_requests ?? 0 }}</span></div>
             </template>
           </div>
         </n-card>
@@ -129,7 +129,7 @@
           <div class="card-header-label">PSK 密钥状态</div>
           <div class="card-large-text text-amber">
             <n-skeleton v-if="loading && !keyStatus" text style="width: 60%; height: 20px; border-radius: 4px;" />
-            <span v-else>{{ keyStatus?.current_key_id ? shortValue(keyStatus.current_key_id) : '-' }}</span>
+            <span v-else class="text-ellipsis" :title="keyStatus?.current_key_id || '-'">{{ keyStatus?.current_key_id || '-' }}</span>
           </div>
           <div class="card-meta-list">
             <template v-if="loading && !keyStatus">
@@ -137,7 +137,7 @@
               <div class="sub-info"><n-skeleton text style="width: 80%; height: 13px;" /></div>
             </template>
             <template v-else>
-              <div class="sub-info">Next: {{ shortValue(keyStatus?.next_key_id) || '未就绪' }}</div>
+              <div class="sub-info"><span>Next:</span><span class="text-ellipsis meta-value" :title="keyStatus?.next_key_id || '未就绪'">{{ keyStatus?.next_key_id || '未就绪' }}</span></div>
               <div class="sub-info action-row">
                 <n-button text size="tiny" type="primary" :disabled="!store.isAdmin" @click="handleRotateKey('prepare')">准备新密钥</n-button>
                 <span class="divider">|</span>
@@ -180,13 +180,13 @@
             <tr v-for="m in members" :key="m.member_id">
               <td class="member-id-cell">
                 <div class="member-identity">
-                  <strong class="member-id-value" :title="m.member_id">{{ m.member_id }}</strong>
+                  <strong class="member-id-value text-ellipsis" :title="m.member_id">{{ m.member_id }}</strong>
                   <n-tag v-if="m.member_id === cluster?.leader" size="small" type="success">LEADER</n-tag>
                   <n-tag v-else-if="m.member_id === cluster?.primary" size="small" type="info">PRIMARY</n-tag>
                 </div>
               </td>
               <td>
-                <n-tag :type="isMemberHAOnline(m) ? 'success' : m.connected ? 'warning' : 'error'" size="small">
+                <n-tag class="value-tag" :title="memberHAStatus(m)" :type="isMemberHAOnline(m) ? 'success' : m.connected ? 'warning' : 'error'" size="small">
                   {{ memberHAStatus(m) }}
                 </n-tag>
               </td>
@@ -205,15 +205,15 @@
               <td class="member-priority">{{ m.priority }}</td>
               <td>
                 <div class="member-detail member-addresses">
-                  <code v-for="ip in m.advertised_addresses" :key="ip">{{ ip }}</code>
+                  <code v-for="ip in m.advertised_addresses" :key="ip" class="text-ellipsis" :title="ip">{{ ip }}</code>
                   <span v-if="!m.advertised_addresses?.length" class="text-muted">—</span>
                 </div>
               </td>
-              <td class="member-addresses"><code v-if="m.observed_address">{{ m.observed_address }}</code><span v-else class="text-muted">—</span></td>
+              <td class="member-addresses"><code v-if="m.observed_address" class="text-ellipsis" :title="m.observed_address">{{ m.observed_address }}</code><span v-else class="text-muted">—</span></td>
               <td>
                 <div class="member-detail member-replication">
                   <span>索引 {{ m.match_index ?? 0 }}<span v-if="m.member_id !== cluster?.leader" class="member-lag" :class="{ 'text-amber': (m.lag ?? 0) > 0 }">落后 {{ m.lag ?? 0 }}</span></span>
-                  <div class="sub-info" :title="replicationDigest(m.member_id)">Digest: {{ shortValue(replicationDigest(m.member_id)) }}</div>
+                  <div class="sub-info"><span>Digest:</span><span class="text-ellipsis meta-value" :title="replicationDigest(m.member_id) || '-'">{{ replicationDigest(m.member_id) || '-' }}</span></div>
                 </div>
               </td>
               <td>
@@ -231,15 +231,15 @@
     <!-- Invite Tokens Table -->
     <n-card title="入网邀请令牌记录 (Invite Tokens)">
       <n-scrollbar x-scrollable>
-        <n-table :bordered="false" :single-line="true" style="min-width: 780px;">
+        <n-table :bordered="false" :single-line="true" style="min-width: 1000px; table-layout: fixed;">
           <thead>
             <tr>
-              <th style="width: 120px;">ID 前缀</th>
-              <th>目标 Member ID</th>
-              <th style="width: 100px;">预设优先级</th>
-              <th style="width: 90px;">状态</th>
-              <th style="width: 170px;">过期时间</th>
-              <th style="width: 150px;">操作</th>
+              <th style="width: 150px;">ID 前缀</th>
+              <th style="width: 240px;">目标 Member ID</th>
+              <th style="width: 140px;">预设优先级</th>
+              <th style="width: 100px;">状态</th>
+              <th style="width: 200px;">过期时间</th>
+              <th style="width: 170px;">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -247,8 +247,8 @@
               <td colspan="6" class="text-center text-muted">暂无有效 Invite 记录</td>
             </tr>
             <tr v-for="inv in invites" :key="inv.id_prefix">
-              <td><code>{{ inv.id_prefix }}...</code></td>
-              <td><strong>{{ inv.member_id }}</strong></td>
+              <td><code class="text-ellipsis" :title="inv.id_prefix">{{ inv.id_prefix }}</code></td>
+              <td><strong class="text-ellipsis" :title="inv.member_id">{{ inv.member_id }}</strong></td>
               <td>{{ inv.priority }}</td>
               <td>
                 <n-tag
@@ -360,10 +360,10 @@
     <n-modal
       v-model:show="showPriorityModal"
       preset="card"
-      :title="`修改节点优先级: ${editingMember?.member_id}`"
       style="width: 440px; max-width: calc(100vw - 32px);"
       :bordered="false"
     >
+      <template #header><span class="text-ellipsis" :title="`修改节点优先级: ${editingMember?.member_id}`">修改节点优先级: {{ editingMember?.member_id }}</span></template>
       <n-form label-placement="left" label-width="90">
         <n-form-item label="节点 ID">
           <n-input :value="editingMember?.member_id" disabled />
@@ -558,11 +558,6 @@ function formatLastSeen(lastSeen?: string) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
 
-function shortValue(value?: string, length = 16) {
-  if (!value) return '-'
-  return value.length > length ? `${value.slice(0, length)}…` : value
-}
-
 function replicationDigest(memberId: string) {
   if (memberId === cluster.value?.member) return replication.value?.digest
   return replication.value?.peers.find((peer) => peer.member_id === memberId)?.digest
@@ -695,6 +690,7 @@ watch(() => store.topologySnapshot, applyTopology, { immediate: true })
 <style scoped>
 .members-table {
   min-width: 1600px;
+  table-layout: fixed;
 }
 
 .members-table th, .members-table td {
@@ -710,19 +706,19 @@ watch(() => store.topologySnapshot, applyTopology, { immediate: true })
   word-break: keep-all;
 }
 
-.member-id-value {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .member-identity, .member-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.member-identity {
+  flex-wrap: nowrap;
+}
+
+.member-id-value {
+  flex: 1 1 auto;
 }
 
 .member-detail {
@@ -732,9 +728,13 @@ watch(() => store.topologySnapshot, applyTopology, { immediate: true })
   gap: 4px;
 }
 
+.member-addresses,
+.member-replication {
+  align-items: stretch;
+}
+
 .member-addresses code {
-  display: inline-block;
-  overflow-wrap: anywhere;
+  width: 100%;
 }
 
 .members-table .member-priority {
@@ -861,6 +861,11 @@ watch(() => store.topologySnapshot, applyTopology, { immediate: true })
   text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+.meta-value {
+  flex: 1 1 0;
 }
 
 .action-row {
