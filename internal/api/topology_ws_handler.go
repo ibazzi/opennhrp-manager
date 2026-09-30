@@ -54,6 +54,17 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 	defer conn.Close()
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+	conn.SetReadLimit(1024)
+	go func() {
+		defer cancel()
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
 
 	nodeID := c.Query("node_id")
 	includeHA := c.Query("include_ha") == "1"
@@ -66,7 +77,7 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 	logs, unsubscribeLogs := h.logHub.Subscribe()
 	defer unsubscribeLogs()
 
-	if err := h.writeSnapshotWithTimeout(conn, nodeID, includeHA); err != nil {
+	if err := h.writeSnapshotWithTimeout(ctx, conn, nodeID, includeHA); err != nil {
 		return
 	}
 	dirty := false
@@ -76,6 +87,8 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 	defer ping.Stop()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case _, ok := <-updates:
 			if !ok {
 				return
@@ -88,7 +101,7 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 		case <-flush.C:
 			if dirty {
 				dirty = false
-				if err := h.writeSnapshotWithTimeout(conn, nodeID, includeHA); err != nil {
+				if err := h.writeSnapshotWithTimeout(ctx, conn, nodeID, includeHA); err != nil {
 					return
 				}
 			}
@@ -100,8 +113,8 @@ func (h *TopologyWSHandler) HandleWS(c *gin.Context) {
 	}
 }
 
-func (h *TopologyWSHandler) writeSnapshotWithTimeout(conn *websocket.Conn, nodeID string, includeHA bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), topologySnapshotTimeout)
+func (h *TopologyWSHandler) writeSnapshotWithTimeout(parent context.Context, conn *websocket.Conn, nodeID string, includeHA bool) error {
+	ctx, cancel := context.WithTimeout(parent, topologySnapshotTimeout)
 	defer cancel()
 	return h.writeSnapshot(ctx, conn, nodeID, includeHA)
 }
